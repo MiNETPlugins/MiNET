@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using log4net;
 using MiNET.Blocks;
+using MiNET.Entities.Behaviors;
 using MiNET.Utils;
 using MiNET.Worlds;
 
@@ -12,97 +14,187 @@ namespace MiNET.Entities
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof (Mob));
 
-		public DateTime LastSeenPlayeTimer { get; set; }
+		public bool DespawnIfNotSeenPlayer { get; set; }
+		public DateTime LastSeenPlayerTimer { get; set; }
+
+		public List<IBehavior> Behaviors { get; } = new List<IBehavior>();
+		private IBehavior _currentBehavior = null;
+		public MobController Controller { get; private set; }
+
+		public double Direction { get; set; }
+		public double Speed { get; set; } = 0.25f;
+
+		public bool IsOnGround { get; set; }
+
+		public Entity Target { get; private set; }
 
 		public Mob(int entityTypeId, Level level) : base(entityTypeId, level)
 		{
 			Width = Length = 0.6;
 			Height = 1.80;
+			Controller = new MobController(this);
 		}
 
 		public Mob(EntityType mobTypes, Level level) : this((int) mobTypes, level)
 		{
 		}
 
+		public virtual void SetTarget(Entity target)
+		{
+			if (Target == target) return;
+
+			Target = target;
+
+			if (target != null && !IsTamed && !target.HealthManager.IsDead)
+				IsAngry = true;
+			else
+				IsAngry = false;
+
+			BroadcastSetEntityData();
+		}
+
+		public Vector3 GetHorizDir()
+		{
+			Vector3 vector = new Vector3();
+
+			double pitch = 0;
+			double yaw = Direction.ToRadians();
+			vector.X = (float) (-Math.Sin(yaw)*Math.Cos(pitch));
+			vector.Y = (float) -Math.Sin(pitch);
+			vector.Z = (float) (Math.Cos(yaw)*Math.Cos(pitch));
+
+			return Vector3.Normalize(vector);
+		}
+
 		public override void SpawnEntity()
 		{
-			LastSeenPlayeTimer = DateTime.UtcNow;
+			LastSeenPlayerTimer = DateTime.UtcNow;
 			base.SpawnEntity();
 		}
+
+
+		public Vector3 _lastSentRotation = Vector3.Zero;
+		public Vector3 _lastSentPos = new Vector3();
 
 		public override void OnTick()
 		{
 			base.OnTick();
 
-			if (DateTime.UtcNow - LastSeenPlayeTimer > TimeSpan.FromSeconds(30))
+			if (HealthManager.IsDead) return;
+
+			if (Level.EnableChunkTicking && DespawnIfNotSeenPlayer && DateTime.UtcNow - LastSeenPlayerTimer > TimeSpan.FromSeconds(30))
 			{
-				if (Level.GetSpawnedPlayers().Count(e => Vector3.Distance(KnownPosition, e.KnownPosition) < 32) == 0)
+				if (Level.Players.Count(player => player.Value.IsSpawned && Vector3.Distance(KnownPosition, player.Value.KnownPosition) < 32) == 0)
 				{
 					if (Level.Random.Next(800) == 0)
 					{
-						Log.Warn($"Despawn because didn't see any players within 32 blocks for 30s or longer. Last seen {LastSeenPlayeTimer}");
+						if (Log.IsDebugEnabled)
+							Log.Debug($"Despawn because didn't see any players within 32 blocks for 30s or longer. Last seen {LastSeenPlayerTimer}");
+
 						DespawnEntity();
 						return;
 					}
 				}
 				else
 				{
-					LastSeenPlayeTimer = DateTime.UtcNow;
+					LastSeenPlayerTimer = DateTime.UtcNow;
 				}
 			}
 
+			_currentBehavior = GetBehavior();
 
-			if (Velocity.Length() > 0.01)
+			// Execute move
+			bool onGroundBefore = IsMobOnGround(KnownPosition);
+
+			KnownPosition.X += (float) Velocity.X;
+			KnownPosition.Y += (float) Velocity.Y;
+			KnownPosition.Z += (float) Velocity.Z;
+
+			// Fix potential fall through ground because of speed
+			IsOnGround = IsMobOnGround(KnownPosition);
+			if (!onGroundBefore && IsOnGround)
 			{
-				PlayerLocation oldPosition = (PlayerLocation) KnownPosition.Clone();
-				bool onGroundBefore = IsOnGround(KnownPosition);
+				while (Level.GetBlock(KnownPosition).IsSolid)
+				{
+					KnownPosition.Y = (float) Math.Floor(KnownPosition.Y + 1);
+				}
 
-				KnownPosition.X += (float) Velocity.X;
-				KnownPosition.Y += (float) Velocity.Y;
-				KnownPosition.Z += (float) Velocity.Z;
+				KnownPosition.Y = (float) Math.Floor(KnownPosition.Y);
+				Velocity *= new Vector3(0, 1, 0);
+			}
+
+			//if (Math.Abs(_lastSentDir - Direction) < 1.1) Direction = _lastSentDir;
+			//if (Math.Abs(_lastSentHeadYaw - KnownPosition.HeadYaw) < 1.1) KnownPosition.HeadYaw = (float) _lastSentHeadYaw;
+
+			if ((_lastSentPos - KnownPosition).Length() > 0.01 || KnownPosition.GetDirection() != _lastSentRotation)
+			{
+				_lastSentPos = KnownPosition;
+				_lastSentRotation = KnownPosition.GetDirection();
+
 				BroadcastMove();
 				BroadcastMotion();
-
-				bool onGround = IsOnGround(KnownPosition);
-				if (!onGroundBefore && onGround)
-				{
-					while (!Level.IsAir(KnownPosition.GetCoordinates3D()))
-					{
-						KnownPosition.Y++;
-					}
-					KnownPosition.Y = (float) Math.Floor(KnownPosition.Y);
-					Velocity = Vector3.Zero;
-					BroadcastMove();
-					BroadcastMotion();
-				}
-				else
-				{
-					if (!onGround)
-					{
-						Velocity -= new Vector3(0, 0.08f, 0);
-					}
-
-					Velocity *= new Vector3(0.86f, 1, 0.86f);
-				}
 			}
-			else if (Velocity != Vector3.Zero)
+
+			// Calculate velocity for next move
+			_currentBehavior?.OnTick();
+
+			bool inWater = IsMobInFluid(KnownPosition);
+
+			if (inWater && Level.Random.NextDouble() < 0.8)
 			{
-				KnownPosition.X += (float) Velocity.X;
-				KnownPosition.Y += (float) Velocity.Y;
-				KnownPosition.Z += (float) Velocity.Z;
-
-				Velocity = Vector3.Zero;
-				LastUpdatedTime = DateTime.UtcNow;
-				BroadcastMove(true);
-				BroadcastMotion(true);
+				Velocity += new Vector3(0, 0.039f, 0);
 			}
+			else if (IsOnGround)
+			{
+				if (Velocity.Y < 0) Velocity *= new Vector3(1, 0, 1);
+			}
+			else
+			{
+				Velocity -= new Vector3(0, (float) Gravity, 0);
+			}
+
+			float drag = (float) (1 - Drag);
+			if (inWater)
+			{
+				drag = 0.8F;
+			}
+
+			Velocity *= drag;
+		}
+
+		private IBehavior GetBehavior()
+		{
+			foreach (var behavior in Behaviors)
+			{
+				if (behavior == _currentBehavior)
+				{
+					if (behavior.CanContinue())
+					{
+						return behavior;
+					}
+
+					behavior.OnEnd();
+					_currentBehavior = null;
+				}
+
+				if (behavior.ShouldStart())
+				{
+					if (_currentBehavior == null || Behaviors.IndexOf(_currentBehavior) > Behaviors.IndexOf(behavior))
+					{
+						_currentBehavior?.OnEnd();
+						return behavior;
+					}
+				}
+			}
+
+			return null;
 		}
 
 		protected void CheckBlockAhead()
 		{
 			var length = Length/2;
 			var direction = Vector3.Normalize(Velocity*1.00000101f);
-			var position = KnownPosition.ToVector3();
+			Vector3 position = KnownPosition;
 			int count = (int) (Math.Ceiling(Velocity.Length()/length) + 2);
 			for (int i = 0; i < count; i++)
 			{
@@ -219,15 +311,44 @@ namespace MiNET.Entities
 			return null;
 		}
 
-		protected bool IsOnGround(Vector3 pos)
+		private bool IsMobInFluid(Vector3 position)
 		{
-			Block block = Level.GetBlock((BlockCoordinates) (pos - new Vector3(0, 0.1f, 0)));
+			float y = (float) (position.Y + Height*0.7);
+
+			BlockCoordinates waterPos = new BlockCoordinates
+			{
+				X = (int) Math.Floor(position.X),
+				Y = (int) Math.Floor(y),
+				Z = (int) Math.Floor(position.Z)
+			};
+
+			var block = Level.GetBlock(waterPos);
+
+			if (block == null || (block.Id != 8 && block.Id != 9)) return false;
+
+			return y < Math.Floor(y) + 1 - ((1f/9f) - 0.1111111);
+		}
+
+		private bool IsMobStandingInFluid(Vector3 position)
+		{
+			Block block = Level.GetBlock(position);
+
+			return block is FlowingWater || block is StationaryWater || block is FlowingLava || block is StationaryLava;
+		}
+
+		protected bool IsMobOnGround(Vector3 pos)
+		{
+			if (pos.Y - Math.Truncate(pos.Y) > 0.1)
+				return IsMobInGround(pos);
+
+			BlockCoordinates coord = pos;
+			Block block = Level.GetBlock(coord + BlockCoordinates.Down);
 
 			return block.IsSolid;
 			//return block.IsSolid && block.GetBoundingBox().Contains(GetBoundingBox().OffsetBy(new Vector3(0, -0.1f, 0))) == ContainmentType.Intersects;
 		}
 
-		protected bool IsInGround(Vector3 position)
+		protected bool IsMobInGround(Vector3 position)
 		{
 			Block block = Level.GetBlock(position);
 

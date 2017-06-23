@@ -6,7 +6,7 @@ namespace MiNET.BuilderBase
 {
 	public class BuilderBaseItemFactory : ICustomItemFactory
 	{
-		public Item GetItem(short id, short metadata, byte count)
+		public Item GetItem(short id, short metadata, int count)
 		{
 			if (id == new BrushTool().Id)
 			{
@@ -15,6 +15,10 @@ namespace MiNET.BuilderBase
 			else if (id == new DistanceWand().Id)
 			{
 				return new DistanceWand();
+			}
+			else if (id == new TeleportTool().Id)
+			{
+				return new TeleportTool();
 			}
 
 			return null;

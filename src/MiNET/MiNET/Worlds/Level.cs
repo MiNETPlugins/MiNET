@@ -1,4 +1,29 @@
-﻿using System;
+﻿#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is Niclas Olofsson.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -33,12 +58,12 @@ namespace MiNET.Worlds
 		public static readonly BlockCoordinates North = new BlockCoordinates(-1, 0, 0);
 
 		public IWorldProvider _worldProvider;
+
 		// ReSharper disable once NotAccessedField.Local
 		private Timer _levelTicker;
+
 		private int _worldTickTime = 50;
 		private int _worldDayCycleTime = 24000;
-		//private int _worldDayCycleTime = 19200;
-		//private int _worldDayCycleTime = 14400;
 
 		public PlayerLocation SpawnPoint { get; set; }
 		public ConcurrentDictionary<long, Player> Players { get; private set; } //TODO: Need to protect this, not threadsafe
@@ -52,6 +77,7 @@ namespace MiNET.Worlds
 		public bool IsSurvival => GameMode == GameMode.Survival;
 		public bool HaveDownfall { get; set; }
 		public Difficulty Difficulty { get; set; }
+		public bool AutoSmelt { get; set; } = false;
 		public double CurrentWorldTime { get; set; }
 		public long TickTime { get; set; }
 		public long StartTimeInTicks { get; private set; }
@@ -104,7 +130,7 @@ namespace MiNET.Worlds
 				chunkLoading.Start();
 				// Pre-cache chunks for spawn coordinates
 				int i = 0;
-				foreach (var chunk in GenerateChunks(new ChunkCoordinates(SpawnPoint), new Dictionary<Tuple<int, int>, McpeBatch>(), ViewDistance))
+				foreach (var chunk in GenerateChunks(new ChunkCoordinates(SpawnPoint), new Dictionary<Tuple<int, int>, McpeWrapper>(), ViewDistance))
 				{
 					if (chunk != null) i++;
 				}
@@ -113,8 +139,8 @@ namespace MiNET.Worlds
 
 			if (Config.GetProperty("CheckForSafeSpawn", false))
 			{
-				var chunk = _worldProvider.GenerateChunkColumn(new ChunkCoordinates(SpawnPoint));
-				chunk.RecalcHeight();
+				//var chunk = _worldProvider.GenerateChunkColumn(new ChunkCoordinates(SpawnPoint));
+				//chunk.RecalcHeight();
 
 				var height = GetHeight((BlockCoordinates) SpawnPoint);
 				if (height > SpawnPoint.Y) SpawnPoint.Y = height + 2;
@@ -198,7 +224,7 @@ namespace MiNET.Worlds
 			Log.Info("Closed level: " + LevelId);
 		}
 
-		internal static McpeBatch CreateMcpeBatch(byte[] bytes)
+		internal static McpeWrapper CreateMcpeBatch(byte[] bytes)
 		{
 			return BatchUtils.CreateBatchPacket(bytes, 0, (int) bytes.Length, CompressionLevel.Optimal, true);
 		}
@@ -240,10 +266,10 @@ namespace MiNET.Worlds
 				// The player list keeps us from moving this completely to player.
 				// It's simply to slow and bad.
 
-				Player[] players = GetSpawnedPlayers();
+				Player[] players = GetAllPlayers();
 				List<Player> spawnedPlayers = players.ToList();
 				spawnedPlayers.Add(newPlayer);
-				
+
 				Player[] sendList = spawnedPlayers.ToArray();
 
 				McpePlayerList playerListMessage = McpePlayerList.CreateObject();
@@ -292,7 +318,7 @@ namespace MiNET.Worlds
 		{
 			lock (_playerWriteLock)
 			{
-				var spawnedPlayers = GetSpawnedPlayers();
+				var spawnedPlayers = GetAllPlayers();
 
 				foreach (Player spawnedPlayer in spawnedPlayers)
 				{
@@ -323,7 +349,7 @@ namespace MiNET.Worlds
 
 				if (Entities.TryAdd(entity.EntityId, entity))
 				{
-					entity.SpawnToPlayers(GetSpawnedPlayers());
+					entity.SpawnToPlayers(GetAllPlayers());
 				}
 				else
 				{
@@ -337,7 +363,7 @@ namespace MiNET.Worlds
 			lock (Entities)
 			{
 				if (!Entities.TryRemove(entity.EntityId, out entity)) return; // It's ok. Holograms destroy this play..
-				entity.DespawnFromPlayers(GetSpawnedPlayers());
+				entity.DespawnFromPlayers(GetAllPlayers());
 			}
 		}
 
@@ -351,6 +377,18 @@ namespace MiNET.Worlds
 			//	Log.InfoFormat("Removing staled players on login {0}", username);
 			//	existingPlayer.Value.Disconnect("Duplicate player. Crashed.", false);
 			//}
+		}
+
+		public virtual void BroadcastTitle(string text, TitleType type = TitleType.Title, int fadeIn = 6, int fadeOut = 6, int stayTime = 20, Player sender = null, Player[] sendList = null)
+		{
+			var mcpeSetTitle = McpeSetTitle.CreateObject();
+			mcpeSetTitle.fadeInTime = fadeIn;
+			mcpeSetTitle.stayTime = stayTime;
+			mcpeSetTitle.fadeOutTime = fadeOut;
+			mcpeSetTitle.type = (int) type;
+			mcpeSetTitle.text = text;
+
+			RelayBroadcast(sender, sendList, mcpeSetTitle);
 		}
 
 		public virtual void BroadcastMessage(string text, MessageType type = MessageType.Chat, Player sender = null, Player[] sendList = null)
@@ -382,11 +420,6 @@ namespace MiNET.Worlds
 		public long AvarageTickProcessingTime = 50;
 		public int PlayerCount { get; private set; }
 
-		private void WorldTick(object sender, EventArgs e)
-		{
-			WorldTick(null);
-		}
-
 		private void WorldTick(object sender)
 		{
 			if (_tickTimer.ElapsedMilliseconds < 40)
@@ -395,7 +428,7 @@ namespace MiNET.Worlds
 				return;
 			}
 
-			if (Log.IsDebugEnabled && _tickTimer.ElapsedMilliseconds >= 65) Log.Error($"Time between World tick too too long: {_tickTimer.ElapsedMilliseconds} ms");
+			if (Log.IsDebugEnabled && _tickTimer.ElapsedMilliseconds >= 65) Log.Error($"Time between World tick took too long: {_tickTimer.ElapsedMilliseconds} ms");
 
 			_tickTimer.Restart();
 			try
@@ -404,69 +437,83 @@ namespace MiNET.Worlds
 
 				Player[] players = GetSpawnedPlayers();
 
-				if (IsWorldTimeStarted) CurrentWorldTime ++;
+				if (IsWorldTimeStarted) CurrentWorldTime++;
 				if (CurrentWorldTime > _worldDayCycleTime) CurrentWorldTime = 0;
 				if (IsWorldTimeStarted && TickTime%100 == 0)
 				{
 					McpeSetTime message = McpeSetTime.CreateObject();
-					message.time = (int)CurrentWorldTime;
-					message.started = IsWorldTimeStarted;
+					message.time = (int) CurrentWorldTime;
+					//message.started = IsWorldTimeStarted;
 
 					RelayBroadcast(message);
 				}
 
-				if (EnableChunkTicking || EnableChunkTicking)
+				if (EnableChunkTicking || EnableBlockTicking)
 				{
+					if (EnableChunkTicking) EntitySpawnManager.DespawnMobs(TickTime);
+
 					List<Tuple<int, int>> chunksWithinRadiusOfPlayer = new List<Tuple<int, int>>();
 					foreach (var player in players)
 					{
 						BlockCoordinates bCoord = (BlockCoordinates) player.KnownPosition;
 
-						chunksWithinRadiusOfPlayer = GetChunkCoordinatesForTick(new ChunkCoordinates(bCoord), chunksWithinRadiusOfPlayer, 8);
+						chunksWithinRadiusOfPlayer = GetChunkCoordinatesForTick(new ChunkCoordinates(bCoord), chunksWithinRadiusOfPlayer, 8); // Should actually be 15
 					}
 
-					foreach (var coord in chunksWithinRadiusOfPlayer)
+					ThreadPool.QueueUserWorkItem(state =>
 					{
-						for (int s = 0; s < 16; s++)
+						Parallel.ForEach((List<Tuple<int, int>>) state, coord =>
 						{
-							for (int i = 0; i < 3; i++)
+							var random = new Random();
+							for (int s = 0; s < 16; s++)
 							{
-								int x = Random.Next(16);
-								int y = Random.Next(16);
-								int z = Random.Next(16);
-
-								var blockCoordinates = new BlockCoordinates(x + coord.Item1*16, y + s*16, z + coord.Item2*16);
-								var height = GetHeight(blockCoordinates);
-								if (height > 0 && s*16 > height) continue;
-
-								if (IsAir(blockCoordinates))
+								for (int i = 0; i < 3; i++)
 								{
-									if (i == 0 && EnableChunkTicking)
+									int x = random.Next(16);
+									int y = random.Next(16);
+									int z = random.Next(16);
+
+									var blockCoordinates = new BlockCoordinates(x + coord.Item1*16, y + s*16, z + coord.Item2*16);
+									var height = GetHeight(blockCoordinates);
+									if (height > 0 && s*16 > height) continue;
+
+									if (IsAir(blockCoordinates))
 									{
-										// Entity spawning, only one attempt per chunk
-										EntitySpawnManager.AttemptHostileMobSpawn(TickTime, blockCoordinates);
-										EntitySpawnManager.AttemptPassiveMobSpawn(TickTime, blockCoordinates, chunksWithinRadiusOfPlayer.Count);
+										if (i == 0 && EnableChunkTicking)
+										{
+											// Entity spawning, only one attempt per chunk
+											var numberOfLoadedChunks = ((List<Tuple<int, int>>) state).Count;
+											EntitySpawnManager.AttemptMobSpawn(TickTime, blockCoordinates, numberOfLoadedChunks);
+										}
+
+										continue;
 									}
 
-									continue;
-								}
-
-								if (EnableBlockTicking)
-								{
-									GetBlock(blockCoordinates).OnTick(this, true);
+									if (EnableBlockTicking)
+									{
+										GetBlock(blockCoordinates).OnTick(this, true);
+									}
 								}
 							}
-						}
-					}
+						});
+					}, chunksWithinRadiusOfPlayer);
 				}
+
 				// Block updates
 				foreach (KeyValuePair<BlockCoordinates, long> blockEvent in BlockWithTicks)
 				{
-					if (blockEvent.Value <= TickTime)
+					try
 					{
-						GetBlock(blockEvent.Key).OnTick(this, false);
-						long value;
-						BlockWithTicks.TryRemove(blockEvent.Key, out value);
+						if (blockEvent.Value <= TickTime)
+						{
+							long value;
+							BlockWithTicks.TryRemove(blockEvent.Key, out value);
+							GetBlock(blockEvent.Key).OnTick(this, false);
+						}
+					}
+					catch (Exception e)
+					{
+						Log.Warn("Block ticking", e);
 					}
 				}
 
@@ -527,6 +574,13 @@ namespace MiNET.Worlds
 			return Players.Values.Where(player => player.IsSpawned).ToArray();
 		}
 
+		public Player[] GetAllPlayers()
+		{
+			if (Players == null) return new Player[0]; // HACK
+
+			return Players.Values.ToArray();
+		}
+
 		public Entity[] GetEntites()
 		{
 			lock (Entities)
@@ -571,7 +625,7 @@ namespace MiNET.Worlds
 						PlayerLocation knownPosition = player.KnownPosition;
 
 						McpeMovePlayer move = McpeMovePlayer.CreateObject();
-						move.entityId = player.EntityId;
+						move.runtimeEntityId = player.EntityId;
 						move.x = knownPosition.X;
 						move.y = knownPosition.Y + 1.62f;
 						move.z = knownPosition.Z;
@@ -618,7 +672,7 @@ namespace MiNET.Worlds
 
 				if (players.Length == 1 && entiyMoveCount == 0) return;
 
-				McpeBatch batch = BatchUtils.CreateBatchPacket(stream.GetBuffer(), 0, (int) stream.Length, CompressionLevel.Optimal, false);
+				McpeWrapper batch = BatchUtils.CreateBatchPacket(stream.GetBuffer(), 0, (int) stream.Length, CompressionLevel.Optimal, false);
 				batch.AddReferences(players.Length - 1);
 				batch.Encode();
 				//batch.ValidUntil = now + TimeSpan.FromMilliseconds(50);
@@ -632,17 +686,17 @@ namespace MiNET.Worlds
 
 		public void RelayBroadcast<T>(T message) where T : Package<T>, new()
 		{
-			RelayBroadcast(null, GetSpawnedPlayers(), message);
+			RelayBroadcast(null, GetAllPlayers(), message);
 		}
 
 		public void RelayBroadcast<T>(Player source, T message) where T : Package<T>, new()
 		{
-			RelayBroadcast(source, GetSpawnedPlayers(), message);
+			RelayBroadcast(source, GetAllPlayers(), message);
 		}
 
 		public void RelayBroadcast<T>(Player[] sendList, T message) where T : Package<T>, new()
 		{
-			RelayBroadcast(null, sendList ?? GetSpawnedPlayers(), message);
+			RelayBroadcast(null, sendList ?? GetAllPlayers(), message);
 		}
 
 		public void RelayBroadcast<T>(Player source, Player[] sendList, T message) where T : Package<T>, new()
@@ -674,8 +728,10 @@ namespace MiNET.Worlds
 				message.AddReferences(sendList.Length - 1);
 			}
 
-			Parallel.ForEach(sendList, player =>
+			if (sendList.Length == 1)
 			{
+				Player player = sendList.First();
+
 				if (source != null && player == source)
 				{
 					message.PutPool();
@@ -683,17 +739,30 @@ namespace MiNET.Worlds
 				}
 
 				player.SendPackage(message);
-			});
+			}
+			else
+			{
+				Parallel.ForEach(sendList, player =>
+				{
+					if (source != null && player == source)
+					{
+						message.PutPool();
+						return;
+					}
+
+					player.SendPackage(message);
+				});
+			}
 		}
 
-		public McpeBatch GenerateChunk(ChunkCoordinates chunkPosition)
+		public McpeWrapper GenerateChunk(ChunkCoordinates chunkPosition)
 		{
 			if (_worldProvider == null) return null;
 
 			ChunkColumn chunkColumn = _worldProvider.GenerateChunkColumn(chunkPosition);
 			if (chunkColumn == null) return null;
 
-			McpeBatch chunk = chunkColumn.GetBatch();
+			McpeWrapper chunk = chunkColumn.GetBatch();
 			if (chunk == null) return null;
 
 			return chunk;
@@ -729,7 +798,7 @@ namespace MiNET.Worlds
 			}
 		}
 
-		public IEnumerable<McpeBatch> GenerateChunks(ChunkCoordinates chunkPosition, Dictionary<Tuple<int, int>, McpeBatch> chunksUsed, double radius)
+		public IEnumerable<McpeWrapper> GenerateChunks(ChunkCoordinates chunkPosition, Dictionary<Tuple<int, int>, McpeWrapper> chunksUsed, double radius)
 		{
 			lock (chunksUsed)
 			{
@@ -780,7 +849,7 @@ namespace MiNET.Worlds
 					if (_worldProvider == null) continue;
 
 					ChunkColumn chunkColumn = _worldProvider.GenerateChunkColumn(new ChunkCoordinates(pair.Key.Item1, pair.Key.Item2));
-					McpeBatch chunk = null;
+					McpeWrapper chunk = null;
 					if (chunkColumn != null)
 					{
 						chunk = chunkColumn.GetBatch();
@@ -831,6 +900,16 @@ namespace MiNET.Worlds
 
 			byte bid = chunk.GetBlock(blockCoordinates.X & 0x0f, blockCoordinates.Y & 0xff, blockCoordinates.Z & 0x0f);
 			return bid == 0;
+			//return bid == 0 || bid == 20 || bid == 241; // Need this for skylight calculations. Revise!
+		}
+
+		public bool IsNotBlockingSkylight(BlockCoordinates blockCoordinates)
+		{
+			ChunkColumn chunk = GetChunk(blockCoordinates);
+			if (chunk == null) return true;
+
+			byte bid = chunk.GetBlock(blockCoordinates.X & 0x0f, blockCoordinates.Y & 0xff, blockCoordinates.Z & 0x0f);
+			return bid == 0 || bid == 20 || bid == 241; // Need this for skylight calculations. Revise!
 		}
 
 		public bool IsTransparent(BlockCoordinates blockCoordinates)
@@ -871,9 +950,11 @@ namespace MiNET.Worlds
 			ChunkColumn chunk = _worldProvider.GenerateChunkColumn(new ChunkCoordinates(block.Coordinates.X >> 4, block.Coordinates.Z >> 4));
 			chunk.SetBlock(block.Coordinates.X & 0x0f, block.Coordinates.Y & 0xff, block.Coordinates.Z & 0x0f, block.Id);
 			chunk.SetMetadata(block.Coordinates.X & 0x0f, block.Coordinates.Y & 0xff, block.Coordinates.Z & 0x0f, block.Metadata);
-
 			if (applyPhysics) ApplyPhysics(block.Coordinates.X, block.Coordinates.Y, block.Coordinates.Z);
-			if (block.LightLevel > 0)
+			//chunk.RecalcHeight();
+			//new SkyLightCalculations(true).CalculateSkyLights(this, new[] {chunk});
+			//CalculateSkyLight(block.Coordinates.X, block.Coordinates.Y, block.Coordinates.Z);
+			if (calculateLight && block.LightLevel > 0)
 			{
 				block.BlockLight = (byte) block.LightLevel;
 				chunk.SetBlocklight(block.Coordinates.X & 0x0f, block.Coordinates.Y & 0xff, block.Coordinates.Z & 0x0f, (byte) block.LightLevel);
@@ -887,6 +968,26 @@ namespace MiNET.Worlds
 			message.coordinates = block.Coordinates;
 			message.blockMetaAndPriority = (byte) (0xb << 4 | (block.Metadata & 0xf));
 			RelayBroadcast(message);
+		}
+
+		private void CalculateSkyLight(int x, int y, int z)
+		{
+			DoLight(x, y, z);
+			DoLight(x - 1, y, z);
+			DoLight(x + 1, y, z);
+			DoLight(x, y, z - 1);
+			DoLight(x, y, z + 1);
+			DoLight(x - 1, y, z - 1);
+			DoLight(x - 1, y, z + 1);
+			DoLight(x + 1, y, z - 1);
+			DoLight(x + 1, y, z + 1);
+		}
+
+		private void DoLight(int x, int y, int z)
+		{
+			Block block = GetBlock(x, y, z);
+			//if (block is Air) return;
+			new SkyLightCalculations().Calculate(this, block);
 		}
 
 		public void SetBlockLight(Block block)
@@ -1016,7 +1117,7 @@ namespace MiNET.Worlds
 					block = GetBlock(itemInHand.GetNewCoordinatesFromFace(blockCoordinates, face));
 				}
 
-				if (!AllowBuild || !OnBlockPlace(new BlockPlaceEventArgs(player, this, target, block)))
+				if (!AllowBuild || player.GameMode == GameMode.Spectator || !OnBlockPlace(new BlockPlaceEventArgs(player, this, target, block)))
 				{
 					// Revert
 
@@ -1047,14 +1148,13 @@ namespace MiNET.Worlds
 
 		public void BreakBlock(Player player, BlockCoordinates blockCoordinates)
 		{
-
 			Block block = GetBlock(blockCoordinates);
 			BlockEntity blockEntity = GetBlockEntity(blockCoordinates);
 
 			Item inHand = player.Inventory.GetItemInHand();
 			bool canBreak = inHand.BreakBlock(this, player, block, blockEntity);
 
-			if (!canBreak || !AllowBreak || !OnBlockBreak(new BlockBreakEventArgs(player, this, block, null)))
+			if (!canBreak || !AllowBreak || player.GameMode == GameMode.Spectator || !OnBlockBreak(new BlockBreakEventArgs(player, this, block, null)))
 			{
 				// Revert
 
@@ -1111,13 +1211,15 @@ namespace MiNET.Worlds
 		}
 
 
-		public void DropItem(Vector3 coordinates, Item drop)
+		public virtual void DropItem(Vector3 coordinates, Item drop)
 		{
 			if (GameMode == GameMode.Creative) return;
 
 			if (drop == null) return;
 			if (drop.Id == 0) return;
 			if (drop.Count == 0) return;
+
+			if (AutoSmelt) drop = drop.GetSmelt() ?? drop;
 
 			Random random = new Random();
 			var itemEntity = new ItemEntity(this, drop)
@@ -1134,11 +1236,16 @@ namespace MiNET.Worlds
 			itemEntity.SpawnEntity();
 		}
 
-		public void SetData(int x, int y, int z, byte meta)
+		public void SetData(BlockCoordinates coordinates, byte meta)
 		{
-			Block block = GetBlock(new BlockCoordinates(x, y, z));
+			Block block = GetBlock(coordinates);
 			block.Metadata = meta;
 			SetBlock(block, applyPhysics: false);
+		}
+
+		public void SetData(int x, int y, int z, byte meta)
+		{
+			SetData(new BlockCoordinates(x, y, z), meta);
 		}
 
 		public void ApplyPhysics(int x, int y, int z)
@@ -1186,16 +1293,15 @@ namespace MiNET.Worlds
 		public void ClearLoadedChunks()
 		{
 			var cacheProvider = _worldProvider as ICachingWorldProvider;
-			if (cacheProvider != null)
-			{
-				cacheProvider.ClearCachedChunks();
-			}
+		    cacheProvider?.ClearCachedChunks();
 		}
 
 		public void StrikeLightning(Vector3 position)
 		{
-			Lightning lightning = new Lightning(this);
-			lightning.SpawnEntity();
+			new Lightning(this)
+			{
+				KnownPosition = new PlayerLocation(position)
+			}.SpawnEntity();
 		}
 
 		public void MakeSound(Sound sound)

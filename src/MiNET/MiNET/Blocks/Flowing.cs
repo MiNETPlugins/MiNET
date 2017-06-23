@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using log4net;
 using MiNET.Items;
 using MiNET.Utils;
 using MiNET.Worlds;
@@ -8,6 +9,8 @@ namespace MiNET.Blocks
 {
 	public abstract class Flowing : Block
 	{
+		private static readonly ILog Log = LogManager.GetLogger(typeof (Flowing));
+
 		private int _adjacentSources;
 		private int[] _flowCost = new int[4];
 		private bool[] _optimalFlowDirections = new bool[4];
@@ -17,6 +20,7 @@ namespace MiNET.Blocks
 			IsSolid = false;
 			IsBuildable = false;
 			IsReplacible = true;
+			IsTransparent = true;
 		}
 
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
@@ -434,11 +438,11 @@ namespace MiNET.Blocks
 
 						if (meta == 0)
 						{
-							world.SetBlock(new Obsidian {Coordinates = new BlockCoordinates(x, y, z)});
+							world.SetBlock(new Obsidian { Coordinates = new BlockCoordinates(x, y, z) }, true, false);
 						}
 						else if (meta <= 4)
 						{
-							world.SetBlock(new Cobblestone {Coordinates = new BlockCoordinates(x, y, z)});
+							world.SetBlock(new Cobblestone { Coordinates = new BlockCoordinates(x, y, z) }, true, false);
 						}
 					}
 				}

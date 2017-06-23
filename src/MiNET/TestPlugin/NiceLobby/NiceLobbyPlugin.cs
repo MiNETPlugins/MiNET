@@ -1,4 +1,29 @@
-﻿using System;
+﻿#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is Niclas Olofsson.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
@@ -46,6 +71,16 @@ namespace TestPlugin.NiceLobby
 			server.LevelManager.LevelCreated += (sender, args) =>
 			{
 				Level level = args.Level;
+
+				BossBar bossBar = new BossBar(level)
+				{
+					Animate = false,
+					MaxProgress = 10,
+					Progress = 10,
+					NameTag = $"{ChatColors.Gold}You are playing on a {ChatColors.Gold}MiNET{ChatColors.Gold} server"
+				};
+				bossBar.SpawnEntity();
+
 				//level.AllowBuild = false;
 				//level.AllowBreak = false;
 
@@ -176,27 +211,36 @@ namespace TestPlugin.NiceLobby
 			if (player == null) throw new ArgumentNullException(nameof(eventArgs.Player));
 
 
-			//int idx = 1;
-			//player.Inventory.Slots[idx++] = ItemFactory.GetItem(new ItemIronShovel().Id);
-			//player.Inventory.Slots[idx++] = ItemFactory.GetItem(new ItemIronAxe().Id);
-			//player.Inventory.Slots[idx++] = new ItemBlock(new Sand(), 0) {Count = 64};
-			//player.Inventory.Slots[idx++] = new ItemFlintAndSteel() {Count = 1};
-			//player.Inventory.Slots[idx++] = new ItemBlock(new Torch(), 0) {Count = 64};
-			//player.Inventory.Slots[idx++] = new ItemBlock(new StoneBrick(), 0) {Count = 64};
-			//player.Inventory.Slots[idx++] = new ItemDiamondSword();
-			//player.Inventory.Slots[idx++] = new ItemBread {Count = 20};
-			//   for (short i = 0; i < 16; i++)
-			//   {
-			//             player.Inventory.Slots[idx++] = new ItemBlock(new Glass(), i) { Count = 20 };
-			//         }
+			int idx = 4;
+			//player.Inventory.Slots[idx++] = new ItemBlock(new Block(212), 0) {Count = 64};
+			//player.Inventory.Slots[idx++] = new ItemBlock(new Block(210), 0) {Count = 64};
+			//player.Inventory.Slots[idx++] = new ItemBlock(new Block(211), 0) {Count = 64};
+			//player.Inventory.Slots[idx++] = new ItemBlock(new Block(242), 0) {Count = 64};
+			player.Inventory.Slots[idx++] = new ItemBlock(new Stone(), 0) {Count = 64};
+			player.Inventory.Slots[idx++] = new ItemBlock(new PurpleGlazedTerracotta(), 0) { Count = 64 };
+			player.Inventory.Slots[idx++] = new ItemStick() {Count = 1};
+			player.Inventory.Slots[idx++] = new ItemWheat() {Count = 1};
+			player.Inventory.Slots[idx++] = new ItemCarrot() {Count = 1};
+			player.Inventory.Slots[idx++] = new ItemWheatSeeds() {Count = 1};
+			player.Inventory.Slots[idx++] = new ItemBone() {Count = 64};
+			player.Inventory.Chest = new ItemElytra() {Count = 1};
 
-			//player.SendPlayerInventory();
+			player.SendPlayerInventory();
 
 			_players.TryAdd(player.Username, player);
 
-			level.BroadcastMessage($"{ChatColors.Gold}[{ChatColors.Green}+{ChatColors.Gold}]{ChatFormatting.Reset} {player.Username}");
-			var joinSound = new AnvilUseSound(level.SpawnPoint.ToVector3());
-			joinSound.Spawn(level);
+			ThreadPool.QueueUserWorkItem(state =>
+			{
+				Thread.Sleep(2000);
+				level.BroadcastMessage($"{ChatColors.Gold}[{ChatColors.Green}+{ChatColors.Gold}]{ChatFormatting.Reset} {player.Username}");
+				var joinSound = new AnvilUseSound(level.SpawnPoint.ToVector3());
+				joinSound.Spawn(level);
+
+				player.SendTitle(null, TitleType.Clear);
+				player.SendTitle(null, TitleType.AnimationTimes, 6, 6, 20*10);
+				player.SendTitle($"{ChatColors.White}This is gurun's MiNET test server", TitleType.SubTitle);
+				player.SendTitle($"{ChatColors.Gold}Welcome {player.Username}!", TitleType.Title);
+			});
 		}
 
 		private void OnPlayerLeave(object o, PlayerEventArgs eventArgs)
@@ -253,7 +297,7 @@ namespace TestPlugin.NiceLobby
 				{
 					McpeSetTime timeDay = McpeSetTime.CreateObject();
 					timeDay.time = 0;
-					timeDay.started = true;
+					//timeDay.started = true;
 					level.RelayBroadcast(timeDay);
 
 					ThreadPool.QueueUserWorkItem(delegate(object o)
@@ -262,7 +306,7 @@ namespace TestPlugin.NiceLobby
 
 						McpeSetTime timeReset = McpeSetTime.CreateObject();
 						timeReset.time = (int) level.CurrentWorldTime;
-						timeReset.started = level.IsWorldTimeStarted;
+						//timeReset.started = level.IsWorldTimeStarted;
 						level.RelayBroadcast(timeDay);
 
 						Thread.Sleep(200);
@@ -384,21 +428,13 @@ namespace TestPlugin.NiceLobby
 			//player.SetEffect(new Blindness { Level = 20, Duration = 20 * 10 });
 			//player.SetAutoJump(true);
 
-			if (player.Level.LevelId.Equals("Default"))
-			{
-				player.Level.CurrentWorldTime = 6000;
-				player.Level.IsWorldTimeStarted = false;
-			}
-
-			player.SendSetTime();
-
 			return packet;
 		}
 
 		[PacketHandler, Send, UsedImplicitly]
 		public Package AddPlayerHandler(McpeAddPlayer packet, Player player)
 		{
-			if (_playerEntities.Keys.FirstOrDefault(p => p.EntityId == packet.entityId) != null)
+			if (_playerEntities.Keys.FirstOrDefault(p => p.EntityId == packet.entityIdSelf) != null)
 			{
 				return null;
 			}
@@ -622,7 +658,13 @@ namespace TestPlugin.NiceLobby
 
 			PlayerMob fake = new PlayerMob("§6§lBot: " + name + "", player.Level)
 			{
-				Skin = new Skin {Slim = false, Texture = bytes}, KnownPosition = player.KnownPosition, ItemInHand = new ItemDiamondSword(), Helmet = 302, Chest = 303, Leggings = 304, Boots = 305,
+				Skin = new Skin {Slim = false, Texture = bytes},
+				KnownPosition = player.KnownPosition,
+				ItemInHand = new ItemDiamondSword(),
+				Helmet = 302,
+				Chest = 303,
+				Leggings = 304,
+				Boots = 305,
 			};
 
 			fake.SpawnEntity();
@@ -649,12 +691,14 @@ namespace TestPlugin.NiceLobby
 
 			Mob entity = new Mob(mobType, level)
 			{
-				KnownPosition = player.KnownPosition, HealthManager = player.HealthManager, NameTag = player.NameTag,
+				KnownPosition = player.KnownPosition,
+				HealthManager = player.HealthManager,
+				NameTag = player.NameTag,
 			};
 			entity.SpawnEntity();
 
 			var remove = McpeRemoveEntity.CreateObject();
-			remove.entityId = entity.EntityId;
+			remove.entityIdSelf = entity.EntityId;
 			player.SendPackage(remove);
 
 			_playerEntities[player] = entity;
@@ -670,7 +714,7 @@ namespace TestPlugin.NiceLobby
 				var entity = _playerEntities[player];
 				entity.KnownPosition = player.KnownPosition;
 				var message = McpeMoveEntity.CreateObject();
-				message.entityId = entity.EntityId;
+				message.runtimeEntityId = entity.EntityId;
 				message.position = entity.KnownPosition;
 				player.Level.RelayBroadcast(message);
 			}
@@ -708,7 +752,12 @@ namespace TestPlugin.NiceLobby
 
 			var playerLocation = new PlayerLocation
 			{
-				X = x, Y = y, Z = z, Yaw = 91, Pitch = 28, HeadYaw = 91
+				X = x,
+				Y = y,
+				Z = z,
+				Yaw = 91,
+				Pitch = 28,
+				HeadYaw = 91
 			};
 
 			ThreadPool.QueueUserWorkItem(delegate(object state) { player.SpawnLevel(player.Level, playerLocation); }, null);
@@ -892,11 +941,20 @@ namespace TestPlugin.NiceLobby
 		}
 
 
-		private McpeBatch CreateCachedPacket(long mapId, byte[] bitmapToBytes)
+		private McpeWrapper CreateCachedPacket(long mapId, byte[] bitmapToBytes)
 		{
 			MapInfo mapInfo = new MapInfo
 			{
-				MapId = mapId, UpdateType = 2, Scale = 0, X = 0, Z = 0, Col = 128, Row = 128, XOffset = 0, ZOffset = 0, Data = bitmapToBytes,
+				MapId = mapId,
+				UpdateType = 2,
+				Scale = 0,
+				X = 0,
+				Z = 0,
+				Col = 128,
+				Row = 128,
+				XOffset = 0,
+				ZOffset = 0,
+				Data = bitmapToBytes,
 			};
 
 			McpeClientboundMapItemData packet = McpeClientboundMapItemData.CreateObject();
@@ -906,9 +964,9 @@ namespace TestPlugin.NiceLobby
 			return batch;
 		}
 
-		internal static McpeBatch CreateMcpeBatch(byte[] bytes)
+		internal static McpeWrapper CreateMcpeBatch(byte[] bytes)
 		{
-			McpeBatch batch = BatchUtils.CreateBatchPacket(bytes, 0, (int) bytes.Length, CompressionLevel.Optimal, true);
+			McpeWrapper batch = BatchUtils.CreateBatchPacket(bytes, 0, (int) bytes.Length, CompressionLevel.Optimal, true);
 			batch.MarkPermanent();
 			batch.Encode();
 			return batch;

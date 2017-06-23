@@ -1,10 +1,38 @@
+#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is Niclas Olofsson.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
+using System.Threading;
 using MiNET.Entities;
 using MiNET.Entities.Hostile;
 using MiNET.Entities.Passive;
 using MiNET.Items;
+using MiNET.Net;
 using MiNET.Plugins.Attributes;
 using MiNET.Utils;
 using MiNET.Worlds;
@@ -23,6 +51,8 @@ namespace MiNET.Plugins.Commands
 		public class SimpleResponse
 		{
 			public string Body { get; set; }
+			public int StatusCode { get; set; }
+			public int SuccessCount { get; set; } = 1;
 		}
 
 		[Command(Name = "op")]
@@ -49,7 +79,7 @@ namespace MiNET.Plugins.Commands
 				body = string.Join(", ", names);
 			}
 
-			return new SimpleResponse() {Body = $"Oped: {body}"};
+			return new SimpleResponse {Body = $"Oped: {body}"};
 		}
 
 		[Command]
@@ -82,7 +112,7 @@ namespace MiNET.Plugins.Commands
 		}
 
 		[Command]
-		public void Summon(Player player, EntityTypeEnum entityType, bool noAi=false, BlockPos spawnPos = null)
+		public void Summon(Player player, EntityTypeEnum entityType, bool noAi = true, BlockPos spawnPos = null)
 		{
 			EntityType petType;
 			try
@@ -238,7 +268,16 @@ namespace MiNET.Plugins.Commands
 					mob = new SkeletonHorse(world);
 					break;
 				case EntityType.Wither:
-					mob = new Mob(EntityType.Wither, world);
+					mob = new Wither(world);
+					break;
+				case EntityType.Evoker:
+					mob = new Evoker(world);
+					break;
+				case EntityType.Vindicator:
+					mob = new Vindicator(world);
+					break;
+				case EntityType.Vex:
+					mob = new Vex(world);
 					break;
 				case EntityType.Npc:
 					mob = new PlayerMob("test", world);
@@ -247,8 +286,8 @@ namespace MiNET.Plugins.Commands
 
 			if (mob == null) return;
 			mob.NoAi = noAi;
-			var direction = Vector3.Normalize(player.KnownPosition.GetHeadDirection()) * 1.5f;
-			mob.KnownPosition = new PlayerLocation(coordinates.X + direction.X, coordinates.Y, coordinates.Z + direction.Z);
+			var direction = Vector3.Normalize(player.KnownPosition.GetHeadDirection())*1.5f;
+			mob.KnownPosition = new PlayerLocation(coordinates.X + direction.X, coordinates.Y, coordinates.Z + direction.Z, coordinates.HeadYaw, coordinates.Yaw);
 			mob.SpawnEntity();
 		}
 
@@ -278,22 +317,243 @@ namespace MiNET.Plugins.Commands
 		{
 			Level level = commander.Level;
 			level.Difficulty = difficulty;
-			foreach (var player in level.GetSpawnedPlayers())
+			foreach (var player in level.GetAllPlayers())
 			{
 				player.SendSetDificulty();
 			}
 
-			return new SimpleResponse { Body = $"{commander.Username} set difficulty to {difficulty}" };
+			return new SimpleResponse {Body = $"{commander.Username} set difficulty to {difficulty}"};
 		}
 
 		[Command(Name = "time set")]
-		public SimpleResponse TimeSet(Player commander, int amount)
+		public SimpleResponse TimeSet(Player commander, int time)
 		{
 			Level level = commander.Level;
-			level.CurrentWorldTime = amount;
+			level.CurrentWorldTime = time;
 
-			return new SimpleResponse { Body = $"{commander.Username} sets time to {amount}" };
+			McpeSetTime message = McpeSetTime.CreateObject();
+			message.time = (int) level.CurrentWorldTime;
+			//message.started = level.IsWorldTimeStarted;
+
+			level.RelayBroadcast(message);
+
+			return new SimpleResponse {Body = $"{commander.Username} sets time to {time}"};
 		}
 
+		public enum DayNight
+		{
+			Day = 1000,
+			Night = 13000
+		}
+
+		[Command(Name = "time set")]
+		public SimpleResponse TimeSet(Player commander, DayNight time)
+		{
+			Level level = commander.Level;
+			level.CurrentWorldTime = (int) time;
+
+			McpeSetTime message = McpeSetTime.CreateObject();
+			message.time = (int) level.CurrentWorldTime;
+			//message.started = level.IsWorldTimeStarted;
+
+			level.RelayBroadcast(message);
+
+			return new SimpleResponse {Body = $"{commander.Username} sets time to {time}"};
+		}
+
+		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports self to given position.")]
+		public SimpleResponse Teleport(Player commander, BlockPos destination, int yrot = 90, int xrot = 0)
+		{
+			var coordinates = commander.KnownPosition;
+			if (destination != null)
+			{
+				if (destination.XRelative)
+					coordinates.X += destination.X;
+				else
+					coordinates.X = destination.X;
+
+				if (destination.YRelative)
+					coordinates.Y += destination.Y;
+				else
+					coordinates.Y = destination.Y;
+
+				if (destination.ZRelative)
+					coordinates.Z += destination.Z;
+				else
+					coordinates.Z = destination.Z;
+			}
+
+			ThreadPool.QueueUserWorkItem(delegate
+			{
+				commander.Teleport(new PlayerLocation
+				{
+					X = coordinates.X,
+					Y = coordinates.Y,
+					Z = coordinates.Z,
+					Yaw = yrot,
+					Pitch = xrot,
+					HeadYaw = yrot
+				});
+			}, null);
+
+			return new SimpleResponse {Body = $"{commander.Username} teleported to coordinates {coordinates.X},{coordinates.Y},{coordinates.Z}."};
+		}
+
+		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports player to given coordinates.")]
+		public SimpleResponse Teleport(Player commander, Target victim, BlockPos destination, int yrot = 90, int xrot = 0)
+		{
+			string body = victim.Selector;
+
+			if (victim.Players != null)
+			{
+				List<string> names = new List<string>();
+				foreach (var p in victim.Players)
+				{
+					names.Add(p.Username);
+
+					ThreadPool.QueueUserWorkItem(delegate
+					{
+						var coordinates = p.KnownPosition;
+						if (destination != null)
+						{
+							if (destination.XRelative)
+								coordinates.X += destination.X;
+							else
+								coordinates.X = destination.X;
+
+							if (destination.YRelative)
+								coordinates.Y += destination.Y;
+							else
+								coordinates.Y = destination.Y;
+
+							if (destination.ZRelative)
+								coordinates.Z += destination.Z;
+							else
+								coordinates.Z = destination.Z;
+						}
+
+						p.Teleport(new PlayerLocation
+						{
+							X = coordinates.X,
+							Y = coordinates.Y,
+							Z = coordinates.Z,
+							Yaw = yrot,
+							Pitch = xrot,
+							HeadYaw = yrot
+						});
+					}, null);
+				}
+				body = string.Join(", ", names);
+			}
+
+			return new SimpleResponse {Body = $"{body} teleported to new coordinates."};
+		}
+
+
+		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports player to other player.")]
+		public SimpleResponse Teleport(Player commander, Target victim, Target target)
+		{
+			string body = victim.Selector;
+
+			if (target.Players == null || target.Players.Length != 1) return new SimpleResponse {Body = "Found not target for teleport"};
+
+			Player targetPlayer = target.Players.First();
+
+			if (victim.Players != null)
+			{
+				List<string> names = new List<string>();
+				foreach (var p in victim.Players)
+				{
+					names.Add(p.Username);
+
+					ThreadPool.QueueUserWorkItem(delegate
+					{
+						var coordinates = targetPlayer.KnownPosition;
+						p.Teleport(new PlayerLocation
+						{
+							X = coordinates.X,
+							Y = coordinates.Y,
+							Z = coordinates.Z,
+							Yaw = coordinates.Yaw,
+							Pitch = coordinates.Pitch,
+							HeadYaw = coordinates.HeadYaw
+						});
+					}, null);
+				}
+				body = string.Join(", ", names);
+			}
+
+
+			return new SimpleResponse {Body = $"Teleported {body} to {targetPlayer.Username}."};
+		}
+
+		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports self to other player.")]
+		public SimpleResponse Teleport(Player commander, Target target)
+		{
+			if (target.Players == null || target.Players.Length != 1) return new SimpleResponse {Body = "Found not target for teleport"};
+
+			Player targetPlayer = target.Players.First();
+
+			var coordinates = targetPlayer.KnownPosition;
+
+			ThreadPool.QueueUserWorkItem(delegate
+			{
+				commander.Teleport(new PlayerLocation
+				{
+					X = coordinates.X,
+					Y = coordinates.Y,
+					Z = coordinates.Z,
+					Yaw = coordinates.Yaw,
+					Pitch = coordinates.Pitch,
+					HeadYaw = coordinates.HeadYaw
+				});
+			}, null);
+
+
+			return new SimpleResponse {Body = $"Teleported to {targetPlayer.Username}."};
+		}
+
+		[Command]
+		public void Enchant(Player commander, Target target, EnchantmentTypeEnum enchantmentTypeName, int level = 1)
+		{
+			Player targetPlayer = target.Players.First();
+			Item item = targetPlayer.Inventory.GetItemInHand();
+			if (item is ItemAir) return;
+
+			EnchantingType enchanting;
+			if (!Enum.TryParse(enchantmentTypeName.Value.Replace("_", ""), true, out enchanting)) return;
+
+			var enchanings = item.GetEnchantings();
+			enchanings.RemoveAll(ench => ench.Id == enchanting);
+			enchanings.Add(new Enchanting {Id = enchanting, Level = (short) level});
+			item.SetEnchantings(enchanings);
+			targetPlayer.Inventory.SendSetSlot(targetPlayer.Inventory.InHandSlot);
+		}
+
+		[Command]
+		public SimpleResponse GameMode(Player commander, GameMode gameMode, Target target = null)
+		{
+			Player targetPlayer = commander;
+			if (target != null) targetPlayer = target.Players.First();
+
+			switch (gameMode)
+			{
+				case Worlds.GameMode.Spectator:
+					targetPlayer.SetSpectator(true);
+					break;
+				default:
+					targetPlayer.SetGameMode(gameMode);
+					break;
+			}
+
+			commander.Level.BroadcastMessage($"{targetPlayer.Username} changed to game mode {gameMode}.", type: MessageType.Raw);
+
+			return new SimpleResponse {Body = $"Set {targetPlayer.Username} game mode to {gameMode}."};
+		}
+
+		[Command]
+		public void Fill(Player commander, BlockPos from, BlockPos to, BlockTypeEnum tileName, int tileData = 0)
+		{
+		}
 	}
 }

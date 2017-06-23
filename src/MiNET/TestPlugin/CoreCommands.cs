@@ -1,6 +1,32 @@
+#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is Niclas Olofsson.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
@@ -53,6 +79,35 @@ namespace TestPlugin
 		//}
 
 		[Command]
+		public void SpawnAgent(Player player, string text)
+		{
+			Agent agent = new Agent(player.Level);
+			agent.KnownPosition = (PlayerLocation) player.KnownPosition.Clone();
+			agent.Owner = player;
+			agent.NameTag = text;
+			agent.SpawnEntity();
+		}
+
+		[Command]
+		public void SpawnNpc(Player player, string text)
+		{
+			Npc npc = new Npc(player.Level);
+			npc.KnownPosition = (PlayerLocation) player.KnownPosition.Clone();
+			npc.NameTag = text;
+			npc.SpawnEntity();
+		}
+
+		[Command]
+		public VanillaCommands.SimpleResponse Info(Player player)
+		{
+			var level = player.Level;
+			int entityCount = level.Entities.Count;
+
+			string body = $"Entity #{entityCount}";
+			return new VanillaCommands.SimpleResponse() {Body = body};
+		}
+
+		[Command]
 		public void Relight(Player player)
 		{
 			BlockCoordinates pos = player.KnownPosition.GetCoordinates3D();
@@ -71,7 +126,7 @@ namespace TestPlugin
 		{
 		}
 
-		[Command(Aliases = new[] {"csk"})]
+		[Command(Aliases = new[] {"csl"})]
 		public void CalculateSkyLight(Player player)
 		{
 			Task.Run(() =>
@@ -82,14 +137,17 @@ namespace TestPlugin
 			});
 		}
 
-		[Command(Name = "dim")]
-		public void ChangeDimension(Player player)
+		[Command(Aliases = new[] { "cbl" })]
+		public void CalculateBlockLight(Player player)
 		{
-			McpeChangeDimension change = McpeChangeDimension.CreateObject();
-			change.dimension = 1;
-			change.unknown = false;
-			player.SendPackage(change);
+			Task.Run(() =>
+			{
+				new LevelManager().RecalculateBlockLight(player.Level, (AnvilWorldProvider) player.Level._worldProvider);
+				player.CleanCache();
+				player.ForcedSendChunks(() => { player.SendMessage("Calculated blocklights and resent chunks."); });
+			});
 		}
+
 
 		[Command(Name = "le")]
 		public void LevelEvent(Player player, short value)
@@ -224,52 +282,30 @@ namespace TestPlugin
 			}
 		}
 
-		[Command(Name = "gm")]
-		//[Authorize(Users = "gurun")]
-		//[Authorize(Users = "gurunx")]
-		public void GameMode(Player player, int gameMode)
+		[Command(Name = "dim", Aliases = new[] {"dimension"}, Description = "Change dimension. Creates world if not exist.")]
+		public void ChangeDimenion(Player player, DimensionTypesEnum dimType)
 		{
-			player.SetGameMode((GameMode) gameMode);
-
-			player.Level.BroadcastMessage($"{player.Username} changed to game mode {(GameMode) gameMode}.", type: MessageType.Raw);
-		}
-
-
-		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports player to given coordinates.")]
-		public void Teleport(Player player, int x, int y, int z)
-		{
-			ThreadPool.QueueUserWorkItem(delegate(object state)
+			int dimension;
+			switch (dimType.Value)
 			{
-				player.Teleport(new PlayerLocation
-				{
-					X = x,
-					Y = y,
-					Z = z,
-					Yaw = 91,
-					Pitch = 28,
-					HeadYaw = 91
-				});
-			}, null);
+				case "overworld":
+					dimension = 0;
+					break;
+				case "nether":
+					dimension = 1;
+					break;
+				case "the_end":
+					dimension = 2;
+					break;
+				default:
+					return;
+			}
 
-			player.Level.BroadcastMessage(string.Format("{0} teleported to coordinates {1},{2},{3}.", player.Username, x, y, z), type: MessageType.Raw);
-		}
-
-		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports player to default world.")]
-		public void Teleport(Player player)
-		{
-			Teleport(player, "Default");
-		}
-
-		private object _levelSync = new object();
-
-		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports player to given world. Creates world if not exist.")]
-		public void Teleport(Player player, string world)
-		{
 			Level oldLevel = player.Level;
 
-			if (player.Level.LevelId.Equals(world))
+			if (player.Level.LevelId.Equals("" + dimension))
 			{
-				Teleport(player, (int) player.SpawnPosition.X, (int) player.SpawnPosition.Y, (int) player.SpawnPosition.Z);
+				player.Teleport(player.SpawnPosition);
 				return;
 			}
 
@@ -287,7 +323,79 @@ namespace TestPlugin
 
 				if (levels != null)
 				{
-					player.SpawnLevel(null, null, false, delegate
+					player.ChangeDimension(null, null, dimension, delegate
+					{
+						lock (levelManager.Levels)
+						{
+							Level nextLevel = levels.FirstOrDefault(l => l.LevelId != null && l.LevelId.Equals(dimType.Value));
+
+							if (nextLevel == null)
+							{
+								var existingWp = player.Level._worldProvider as AnvilWorldProvider;
+								if(existingWp != null)
+								{
+									DirectoryInfo dir = new DirectoryInfo(existingWp.BasePath);
+									//var path = Directory.GetParent(existingWp.BasePath).FullName + @"\_" + dimType.Value;
+									var path = dir.FullName + @"_" + dimType.Value;
+									Log.Warn($"Path: {path}");
+									var worldProvider = new AnvilWorldProvider(path);
+									worldProvider.Dimension = dimension;
+									nextLevel = new Level(dimType.Value, worldProvider, Context.LevelManager.EntityManager, player.GameMode, Difficulty.Normal);
+									nextLevel.Initialize();
+									Context.LevelManager.Levels.Add(nextLevel);
+								}
+								else
+								{
+									nextLevel = new Level(dimType.Value, new FlatlandWorldProvider(), Context.LevelManager.EntityManager, player.GameMode, Difficulty.Normal);
+									nextLevel.Initialize();
+									Context.LevelManager.Levels.Add(nextLevel);
+								}
+							}
+
+
+							return nextLevel;
+						}
+					});
+				}
+
+				oldLevel.BroadcastMessage(string.Format("{0} teleported to world {1}.", player.Username, player.Level.LevelId), type: MessageType.Raw);
+			}, Context.LevelManager);
+		}
+
+		[Command(Name = "tpw", Aliases = new[] {"teleport"}, Description = "Teleports player to default world.")]
+		public void TeleportWorld(Player player)
+		{
+			TeleportWorld(player, "Default");
+		}
+
+		private object _levelSync = new object();
+
+		[Command(Name = "tpw", Aliases = new[] {"teleport"}, Description = "Teleports player to given world. Creates world if not exist.")]
+		public void TeleportWorld(Player player, string world)
+		{
+			Level oldLevel = player.Level;
+
+			if (player.Level.LevelId.Equals(world))
+			{
+				player.Teleport(player.SpawnPosition);
+				return;
+			}
+
+			if (!Context.LevelManager.Levels.Contains(player.Level))
+			{
+				Context.LevelManager.Levels.Add(player.Level);
+			}
+
+			ThreadPool.QueueUserWorkItem(delegate(object state)
+			{
+				LevelManager levelManager = state as LevelManager;
+				if (levelManager == null) return;
+
+				Level[] levels = levelManager.Levels.ToArray();
+
+				if (levels != null)
+				{
+					player.SpawnLevel(null, null, true, delegate
 					{
 						lock (levelManager.Levels)
 						{
@@ -300,13 +408,13 @@ namespace TestPlugin
 								Context.LevelManager.Levels.Add(nextLevel);
 							}
 
+							oldLevel.BroadcastMessage(string.Format("{0} teleported to world {1}.", player.Username, player.Level.LevelId), type: MessageType.Raw);
 
 							return nextLevel;
 						}
 					});
 				}
 
-				oldLevel.BroadcastMessage(string.Format("{0} teleported to world {1}.", player.Username, player.Level.LevelId), type: MessageType.Raw);
 			}, Context.LevelManager);
 		}
 
@@ -375,15 +483,23 @@ namespace TestPlugin
 		}
 
 		[Command]
-		public void SpawnHologram(Player player, byte id)
+		public void Permission(Player player, int permission)
+		{
+			player.PermissionLevel = (UserPermission) permission;
+			player.SendAdventureSettings();
+		}
+
+
+		[Command]
+		public void Spawn(Player player, int entityId)
 		{
 			Level level = player.Level;
 
-			Mob entity = new Mob(id, level)
+			var entity = new Entity(entityId, level)
 			{
 				KnownPosition = player.KnownPosition,
-				//Data = -(blockId | 0 << 0x10)
 			};
+
 			entity.SpawnEntity();
 		}
 
@@ -659,7 +775,7 @@ namespace TestPlugin
 		private void SendEquipmentForPlayer(Player player)
 		{
 			var msg = McpeMobEquipment.CreateObject();
-			msg.entityId = player.EntityId;
+			msg.runtimeEntityId = player.EntityId;
 			msg.item = player.Inventory.GetItemInHand();
 			msg.slot = 0;
 			player.Level.RelayBroadcast(msg);
@@ -668,7 +784,7 @@ namespace TestPlugin
 		private void SendArmorForPlayer(Player player)
 		{
 			var armorEquipment = McpeMobArmorEquipment.CreateObject();
-			armorEquipment.entityId = player.EntityId;
+			armorEquipment.runtimeEntityId = player.EntityId;
 			armorEquipment.helmet = player.Inventory.Helmet;
 			armorEquipment.chestplate = player.Inventory.Chest;
 			armorEquipment.leggings = player.Inventory.Leggings;
@@ -846,12 +962,18 @@ namespace TestPlugin
 			{
 				player.AddPopup(new Popup()
 				{
-					Priority = 100, MessageType = MessageType.Tip, Message = "SERVER WILL RESTART!", Duration = 20*10,
+					Priority = 100,
+					MessageType = MessageType.Tip,
+					Message = "SERVER WILL RESTART!",
+					Duration = 20*10,
 				});
 
 				player.AddPopup(new Popup()
 				{
-					Priority = 100, MessageType = MessageType.Popup, Message = "Transfering all players!", Duration = 20*10,
+					Priority = 100,
+					MessageType = MessageType.Popup,
+					Message = "Transfering all players!",
+					Duration = 20*10,
 				});
 			}
 
@@ -872,7 +994,8 @@ namespace TestPlugin
 			BlockCoordinates coor = new BlockCoordinates(player.KnownPosition);
 			Chest chest = new Chest
 			{
-				Coordinates = coor, Metadata = 0
+				Coordinates = coor,
+				Metadata = 0
 			};
 			player.Level.SetBlock(chest, true);
 
@@ -938,6 +1061,13 @@ namespace TestPlugin
 		}
 
 		[Command]
+		public void Title(Player player, string text, TitleType type)
+		{
+			player.SendTitle(text, type);
+		}
+
+
+		[Command]
 		public void Count(Player player)
 		{
 			List<string> users = new List<string>();
@@ -951,6 +1081,188 @@ namespace TestPlugin
 			}
 
 			player.SendMessage($"There are {users.Count} of players online.");
+		}
+
+		[Command]
+		public VanillaCommands.SimpleResponse Worldborder(Player player, int radius = 200, bool centerOnPlayer = false)
+		{
+			Level level = player.Level;
+
+			BlockCoordinates center = (BlockCoordinates) level.SpawnPoint;
+			if (centerOnPlayer) center = (BlockCoordinates) player.KnownPosition;
+			center.Y = 0;
+
+			var players = level.GetSpawnedPlayers();
+
+			for (int y = 0; y < 256; y++)
+			{
+				for (int x = -radius; x <= radius; x++)
+				{
+					for (int z = -radius; z <= radius; z++)
+					{
+						if (x != -radius && x != radius && z != -radius && z != radius) continue;
+
+						var block = new Glass() {Coordinates = center + new BlockCoordinates(x, y, z)};
+						level.SetBlock(block, false, false, false);
+
+						List<Player> sendList = new List<Player>();
+						foreach (var p in players)
+						{
+							if (p.KnownPosition.DistanceTo(center + new BlockCoordinates(x, (int) p.KnownPosition.Y, z)) > p.ChunkRadius*16) continue;
+
+							sendList.Add(p);
+						}
+
+						var message = McpeUpdateBlock.CreateObject();
+						message.blockId = block.Id;
+						message.coordinates = block.Coordinates;
+						message.blockMetaAndPriority = (byte) (0xb << 4 | (block.Metadata & 0xf));
+
+						level.RelayBroadcast(sendList.ToArray(), message);
+					}
+				}
+			}
+			return new VanillaCommands.SimpleResponse() {Body = $"Added world border with radius of {radius} around {center}"};
+		}
+
+		[Command]
+		public VanillaCommands.SimpleResponse Test()
+		{
+			return new VanillaCommands.SimpleResponse() {Body = "Test"};
+		}
+
+		[Command]
+		public void GeneratePath(Player player)
+		{
+			Level level = player.Level;
+			Vector3 pos = player.KnownPosition;
+
+			int n = 20;
+
+			RandomCurve ycurve = new RandomCurve(n, 0, 80, 0.1);
+			RandomCurve zcurve = new RandomCurve(n, 0, 100, 0.1);
+
+			bool first = true;
+			for (int x = 0; x < n; x++)
+			{
+				var y = ycurve.GetY(x);
+				var z = zcurve.GetY(x);
+
+				GeneratePortal(level, pos + new Vector3(x*42, (float) y, (float) z), first, x == n - 1);
+				first = false;
+			}
+		}
+
+		private void GeneratePortal(Level level, BlockCoordinates coord, bool isStart = false, bool isLast = false)
+		{
+			Block block = isStart ? (Block) new DiamondBlock() : isLast ? (Block) new EmeraldBlock() : new GoldBlock();
+
+			int[,] coords = new[,]
+			{
+				{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 0},
+				{1, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {1, 5},
+				{2, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 5},
+				{3, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {3, 5},
+				{4, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {4, 5},
+				{5, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {5, 5},
+				{0, 0}, {6, 1}, {6, 2}, {6, 3}, {6, 4}, {6, 5},
+			};
+
+			for (int i = 0; i < coords.Length/2; i++)
+			{
+				Log.Warn($"Lenght {coords.Length}");
+				block.Coordinates = coord + new BlockCoordinates(0, coords[i, 0], coords[i, 1]);
+				level.SetBlock(block);
+			}
+		}
+	}
+
+
+	internal struct SineWave
+	{
+		internal readonly double Amplitude;
+		internal readonly double OrdinaryFrequency;
+		internal readonly double AngularFrequency;
+		internal readonly double Phase;
+		internal readonly double ShiftY;
+
+		internal SineWave(double amplitude, double ordinaryFrequency, double phase, double shiftY)
+		{
+			Amplitude = amplitude;
+			OrdinaryFrequency = ordinaryFrequency;
+			AngularFrequency = 2*Math.PI*ordinaryFrequency;
+			Phase = phase;
+			ShiftY = shiftY;
+		}
+	}
+
+	public class RandomCurve
+	{
+		private SineWave[] m_sineWaves;
+
+		public RandomCurve(int components, double minY, double maxY, double flatness)
+		{
+			m_sineWaves = new SineWave[components];
+
+			double totalPeakToPeakAmplitude = maxY - minY;
+			double averagePeakToPeakAmplitude = totalPeakToPeakAmplitude/components;
+
+			int prime = 1;
+			Random r = new Random();
+			for (int i = 0; i < components; i++)
+			{
+				// from 0.5 to 1.5 of averagePeakToPeakAmplitude 
+				double peakToPeakAmplitude = averagePeakToPeakAmplitude*(r.NextDouble() + 0.5d);
+
+				// peak amplitude is a hald of peak-to-peak amplitude
+				double amplitude = peakToPeakAmplitude/2d;
+
+				// period should be a multiple of the prime number to avoid regularities
+				prime = Utils.GetNextPrime(prime);
+				double period = flatness*prime;
+
+				// ordinary frequency is reciprocal of period
+				double ordinaryFrequency = 1d/period;
+
+				// random phase
+				double phase = 2*Math.PI*(r.NextDouble() + 0.5d);
+
+				// shiftY is the same as amplitude
+				double shiftY = amplitude;
+
+				m_sineWaves[i] =
+					new SineWave(amplitude, ordinaryFrequency, phase, shiftY);
+			}
+		}
+
+		public double GetY(double x)
+		{
+			double y = 0;
+			for (int i = 0; i < m_sineWaves.Length; i++)
+				y += m_sineWaves[i].Amplitude*Math.Sin(m_sineWaves[i].AngularFrequency*x + m_sineWaves[i].Phase) + m_sineWaves[i].ShiftY;
+
+			return y;
+		}
+	}
+
+	internal static class Utils
+	{
+		internal static int GetNextPrime(int i)
+		{
+			int nextPrime = i + 1;
+			for (; !IsPrime(nextPrime); nextPrime++) ;
+			return nextPrime;
+		}
+
+		private static bool IsPrime(int number)
+		{
+			if (number == 1) return false;
+			if (number == 2) return true;
+
+			for (int i = 2; i < number; ++i)
+				if (number%i == 0) return false;
+
+			return true;
 		}
 	}
 }

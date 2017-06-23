@@ -13,12 +13,16 @@ namespace MiNET.Entities.World
 
 		public PrimedTnt(Level level) : base(65, level)
 		{
+			IsIgnited = true;
 		}
 
 		public override MetadataDictionary GetMetadata()
 		{
-			MetadataDictionary metadata = new MetadataDictionary();
-			metadata[16] = new MetadataByte(Fuse);
+			MetadataDictionary metadata = new MetadataDictionary
+			{
+				[0] = new MetadataLong(GetDataValue()),
+				[56] = new MetadataInt(Fuse)
+			};
 
 			return metadata;
 		}
@@ -45,7 +49,7 @@ namespace MiNET.Entities.World
 			else
 			{
 				var entityData = McpeSetEntityData.CreateObject();
-				entityData.entityId = EntityId;
+				entityData.runtimeEntityId = EntityId;
 				entityData.metadata = GetMetadata();
 				Level.RelayBroadcast(entityData);
 				if (CheckPosition) PositionCheck();

@@ -1,6 +1,30 @@
-﻿using System;
+﻿#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is Niclas Olofsson.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
+using System;
 using System.Collections;
-using System.Linq;
 using System.Numerics;
 using log4net;
 using MiNET.Items;
@@ -63,11 +87,10 @@ namespace MiNET.Entities
 			EatingHaystack = 16,
 			MaybeAge = 25,
 			Scale = 39,
-			MaxAir = 44,
-			CollisionBoxHeight = 53,
+			MaxAir = 43,
 			CollisionBoxWidth = 54,
+			CollisionBoxHeight = 55,
 		}
-
 
 		public virtual MetadataDictionary GetMetadata()
 		{
@@ -87,7 +110,7 @@ namespace MiNET.Entities
 			//metadata[23] = new MetadataLong(-1); // Leads EID (target or holder?)
 			//metadata[23] = new MetadataLong(-1); // Leads EID (target or holder?)
 			//metadata[24] = new MetadataByte(0); // Leads on/off
-			metadata[(int) MetadataFlags.MaybeAge] = new MetadataInt(0); // Scale
+			//metadata[(int)MetadataFlags.MaybeAge] = new MetadataInt(0); // Scale
 			metadata[(int) MetadataFlags.Scale] = new MetadataFloat(Scale); // Scale
 			metadata[(int) MetadataFlags.MaxAir] = new MetadataShort(HealthManager.MaxAir);
 			metadata[(int) MetadataFlags.CollisionBoxHeight] = new MetadataFloat(Height); // Collision box width
@@ -106,7 +129,7 @@ namespace MiNET.Entities
 			bits.CopyTo(bytes, 0);
 
 			long dataValue = BitConverter.ToInt64(bytes, 0);
-			Log.Debug($"Bit-array datavalue: dec={dataValue} hex=0x{dataValue:x2}, bin={Convert.ToString((long) dataValue, 2)}b ");
+			//Log.Debug($"Bit-array datavalue: dec={dataValue} hex=0x{dataValue:x2}, bin={Convert.ToString((long) dataValue, 2)}b ");
 			return dataValue;
 		}
 
@@ -129,6 +152,7 @@ namespace MiNET.Entities
 		public bool HaveAi => !NoAi;
 		public bool IsSilent { get; set; }
 		public bool IsWallClimbing { get; set; }
+		public bool CanClimb { get; set; }
 		public bool IsResting { get; set; }
 		public bool IsSitting { get; set; }
 		public bool IsAngry { get; set; }
@@ -137,7 +161,7 @@ namespace MiNET.Entities
 		public bool IsTamed { get; set; }
 		public bool IsLeashed { get; set; }
 		public bool IsSheared { get; set; }
-		public bool IsFlagAllFlying { get; set; }
+		public bool IsGliding { get; set; }
 		public bool IsElder { get; set; }
 		public bool IsMoving { get; set; }
 		public bool IsBreathing => !IsInWater;
@@ -167,6 +191,11 @@ namespace MiNET.Entities
 			NoAi,
 			Silent,
 			WallClimbing,
+
+			CanClimb,
+			CanSwim,
+			CanFly,
+
 			Resting,
 			Sitting,
 			Angry,
@@ -187,8 +216,6 @@ namespace MiNET.Entities
 
 		protected virtual BitArray GetFlags()
 		{
-			IsFlagAllFlying = false;
-
 			BitArray bits = new BitArray(64);
 			bits[(int) DataFlags.OnFire] = HealthManager.IsOnFire;
 			bits[(int) DataFlags.Sneaking] = IsSneaking;
@@ -209,6 +236,7 @@ namespace MiNET.Entities
 			bits[(int) DataFlags.NoAi] = IsNoAi;
 			bits[(int) DataFlags.Silent] = IsSilent;
 			bits[(int) DataFlags.WallClimbing] = IsWallClimbing;
+			bits[(int) DataFlags.CanClimb] = CanClimb;
 			bits[(int) DataFlags.Resting] = IsResting;
 			bits[(int) DataFlags.Sitting] = IsSitting;
 			bits[(int) DataFlags.Angry] = IsAngry;
@@ -217,7 +245,7 @@ namespace MiNET.Entities
 			bits[(int) DataFlags.Tamed] = IsTamed;
 			bits[(int) DataFlags.Leashed] = IsLeashed;
 			bits[(int) DataFlags.Sheared] = IsSheared;
-			bits[(int) DataFlags.FlagAllFlying] = IsFlagAllFlying;
+			bits[(int) DataFlags.FlagAllFlying] = IsGliding;
 			bits[(int) DataFlags.Elder] = IsElder;
 			bits[(int) DataFlags.Moving] = IsMoving;
 			bits[(int) DataFlags.Breathing] = IsBreathing;
@@ -250,7 +278,7 @@ namespace MiNET.Entities
 		{
 			var addEntity = McpeAddEntity.CreateObject();
 			addEntity.entityType = (byte) EntityTypeId;
-			addEntity.entityId = EntityId;
+			addEntity.entityIdSelf = EntityId;
 			addEntity.runtimeEntityId = EntityId;
 			addEntity.x = KnownPosition.X;
 			addEntity.y = KnownPosition.Y;
@@ -261,10 +289,12 @@ namespace MiNET.Entities
 			addEntity.speedX = (float) Velocity.X;
 			addEntity.speedY = (float) Velocity.Y;
 			addEntity.speedZ = (float) Velocity.Z;
+			addEntity.attributes = GetEntityAttributes();
+
 			Level.RelayBroadcast(players, addEntity);
 
 			var msg = addEntity;
-			Log.DebugFormat("McpeAddEntity Entity ID: {0}", msg.entityId);
+			Log.DebugFormat("McpeAddEntity Entity ID: {0}", msg.entityIdSelf);
 			Log.DebugFormat("McpeAddEntity Runtime Entity ID: {0}", msg.runtimeEntityId);
 			Log.DebugFormat("Entity Type: {0}", msg.entityType);
 			Log.DebugFormat("X: {0}", msg.x);
@@ -278,6 +308,63 @@ namespace MiNET.Entities
 			Log.DebugFormat("Metadata: {0}", MetadataDictionary.MetadataToCode(msg.metadata));
 		}
 
+		public virtual EntityAttributes GetEntityAttributes()
+		{
+			var attributes = new EntityAttributes();
+			attributes["minecraft:attack_damage"] = new EntityAttribute
+			{
+				Name = "minecraft:attack_damage",
+				MinValue = 1,
+				MaxValue = 1,
+				Value = 1,
+			};
+			attributes["minecraft:absorption"] = new EntityAttribute
+			{
+				Name = "minecraft:absorption",
+				MinValue = 0,
+				MaxValue = float.MaxValue,
+				Value = HealthManager.Absorption,
+			};
+			attributes["minecraft:health"] = new EntityAttribute
+			{
+				Name = "minecraft:health",
+				MinValue = 0,
+				MaxValue = 20,
+				Value = HealthManager.Hearts,
+			};
+			attributes["minecraft:knockback_resistance"] = new EntityAttribute
+			{
+				Name = "minecraft:knockback_resistance",
+				MinValue = 0,
+				MaxValue = 1,
+				Value = 0,
+			};
+			attributes["minecraft:luck"] = new EntityAttribute
+			{
+				Name = "minecraft:luck",
+				MinValue = -1025,
+				MaxValue = 1024,
+				Value = 0,
+			};
+			attributes["minecraft:fall_damage"] = new EntityAttribute
+			{
+				Name = "minecraft:fall_damage",
+				MinValue = 0,
+				MaxValue = float.MaxValue,
+				Value = 1,
+			};
+			attributes["minecraft:follow_range"] = new EntityAttribute
+			{
+				Name = "minecraft:follow_range",
+				MinValue = 0,
+				MaxValue = 2048,
+				Value = 16,
+			};
+
+			return attributes;
+		}
+
+
 		public virtual void DespawnEntity()
 		{
 			Level.RemoveEntity(this);
@@ -287,16 +374,24 @@ namespace MiNET.Entities
 		public virtual void DespawnFromPlayers(Player[] players)
 		{
 			McpeRemoveEntity mcpeRemoveEntity = McpeRemoveEntity.CreateObject();
-			mcpeRemoveEntity.entityId = EntityId;
+			mcpeRemoveEntity.entityIdSelf = EntityId;
 			Level.RelayBroadcast(players, mcpeRemoveEntity);
 		}
 
 		public virtual void BroadcastSetEntityData()
 		{
 			McpeSetEntityData mcpeSetEntityData = McpeSetEntityData.CreateObject();
-			mcpeSetEntityData.entityId = EntityId;
+			mcpeSetEntityData.runtimeEntityId = EntityId;
 			mcpeSetEntityData.metadata = GetMetadata();
 			Level?.RelayBroadcast(mcpeSetEntityData);
+		}
+
+		public virtual void BroadcastEntityEvent()
+		{
+			var entityEvent = McpeEntityEvent.CreateObject();
+			entityEvent.runtimeEntityId = EntityId;
+			entityEvent.eventId = (byte) (HealthManager.Health <= 0 ? 3 : 2);
+			Level.RelayBroadcast(entityEvent);
 		}
 
 		public BoundingBox GetBoundingBox()
@@ -305,6 +400,12 @@ namespace MiNET.Entities
 			double halfWidth = Width/2;
 
 			return new BoundingBox(new Vector3((float) (pos.X - halfWidth), pos.Y, (float) (pos.Z - halfWidth)), new Vector3((float) (pos.X + halfWidth), (float) (pos.Y + Height), (float) (pos.Z + halfWidth)));
+		}
+
+		public double DistanceTo(Entity entity)
+		{
+			if (entity == null) return -1;
+			return Vector3.Distance(KnownPosition, entity.KnownPosition);
 		}
 
 		public byte GetDirection()
@@ -340,8 +441,9 @@ namespace MiNET.Entities
 			if (NoAi || forceMove)
 			{
 				McpeSetEntityMotion motions = McpeSetEntityMotion.CreateObject();
-				motions.entityId = EntityId;
+				motions.runtimeEntityId = EntityId;
 				motions.velocity = Velocity;
+				motions.Encode();
 				Level.RelayBroadcast(motions);
 			}
 		}
@@ -351,8 +453,9 @@ namespace MiNET.Entities
 			if (NoAi || forceMove)
 			{
 				McpeMoveEntity moveEntity = McpeMoveEntity.CreateObject();
-				moveEntity.entityId = EntityId;
-				moveEntity.position = KnownPosition;
+				moveEntity.runtimeEntityId = EntityId;
+				moveEntity.position = (PlayerLocation) KnownPosition.Clone();
+				moveEntity.Encode();
 				Level.RelayBroadcast(moveEntity);
 			}
 		}
@@ -360,7 +463,7 @@ namespace MiNET.Entities
 
 		public virtual Item[] GetDrops()
 		{
-			return new Item[] {};
+			return new Item[] { };
 		}
 
 		public virtual void DoInteraction(byte actionId, Player player)

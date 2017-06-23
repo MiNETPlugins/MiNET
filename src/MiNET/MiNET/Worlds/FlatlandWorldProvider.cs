@@ -19,7 +19,7 @@ namespace MiNET.Worlds
 		public FlatlandWorldProvider()
 		{
 			IsCaching = true;
-			_spawnPoint = new Vector3(0, 0, 0);
+			_spawnPoint = new Vector3(0, 4, 0);
 		}
 
 		public void Initialize()
@@ -118,12 +118,13 @@ namespace MiNET.Worlds
 				//	}
 				//}
 
-				chunk.RecalcHeight();
-
+				//chunk.RecalcHeight(); // Enable this if you add structures and stuff.
 				_spawnPoint.Y = h + 2;
 
 				// Cache
 				chunk.GetBatch();
+				chunk.isGenerated = true;
+				chunk.NeedSave = false;
 				_chunkCache[chunkCoordinates] = chunk;
 
 				return chunk;
@@ -249,6 +250,7 @@ namespace MiNET.Worlds
 					chunk.SetBlock(x, h++, z, 3); // Dirt
 					chunk.SetBlock(x, h++, z, 3); // Dirt
 					chunk.SetBlock(x, h++, z, 2); // Grass
+					chunk.SetHeight(x, z, (short) h);
 				}
 			}
 

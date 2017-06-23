@@ -2,12 +2,13 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using MiNET.Net;
+using MiNET.Plugins;
 
 namespace MiNET.Utils
 {
 	public class BatchUtils
 	{
-		public static McpeBatch CreateBatchPacket(CompressionLevel compressionLevel, params Package[] packages)
+		public static McpeWrapper CreateBatchPacket(CompressionLevel compressionLevel, params Package[] packages)
 		{
 			using (MemoryStream stream = MiNetServer.MemoryStreamManager.GetStream())
 			{
@@ -24,15 +25,29 @@ namespace MiNET.Utils
 			}
 		}
 
-		public static McpeBatch CreateBatchPacket(byte[] input, int offset, int length, CompressionLevel compressionLevel, bool writeLen)
+		public static McpeWrapper CreateBatchPacket(byte[] input, int offset, int length, CompressionLevel compressionLevel, bool writeLen)
 		{
-			using (var stream = CompressIntoStream(input, offset, length, compressionLevel, writeLen))
-			{
-				var batch = McpeBatch.CreateObject();
-				batch.payload = stream.ToArray();
-				batch.Encode();
-				return batch;
-			}
+			var batch = McpeWrapper.CreateObject();
+			batch.Id = 0xfe;
+
+			batch.payload = Compression.Compress(input, offset, length, writeLen);
+
+			//if (writeLen)
+			//{
+			//	var stream = MiNetServer.MemoryStreamManager.GetStream();
+			//	WriteLength(stream, length);
+			//	stream.Write(input, offset, length);
+			//	batch.payload = stream.ToArray();
+			//}
+			//else
+			//{
+			//	byte[] target = new byte[length];
+			//	Buffer.BlockCopy(input, offset, target, 0, length);
+			//	batch.payload = target;
+			//}
+
+			batch.Encode();
+			return batch;
 		}
 
 		private static MemoryStream CompressIntoStream(byte[] input, int offset, int length, CompressionLevel compressionLevel, bool writeLen = false)

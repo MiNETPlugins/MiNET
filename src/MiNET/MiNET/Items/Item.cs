@@ -20,7 +20,7 @@ namespace MiNET.Items
 		public short Id { get; protected set; }
 		public short Metadata { get; set; }
 		public byte Count { get; set; }
-		public NbtCompound ExtraData { get; set; }
+		public virtual NbtCompound ExtraData { get; set; }
 
 		public ItemMaterial ItemMaterial { get; set; } = ItemMaterial.None;
 		public ItemType ItemType { get; set; } = ItemType.Item;
@@ -29,11 +29,11 @@ namespace MiNET.Items
 		public int Durability { get; set; }
 		public int FuelEfficiency { get; set; }
 
-		protected internal Item(short id, short metadata = 0, byte count = 1)
+		protected internal Item(short id, short metadata = 0, int count = 1)
 		{
 			Id = id;
 			Metadata = metadata;
-			Count = count;
+			Count = (byte) count;
 		}
 
 		public virtual void UseItem(Level world, Player player, BlockCoordinates blockCoordinates)

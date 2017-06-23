@@ -1,3 +1,28 @@
+#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is Niclas Olofsson.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -127,35 +152,61 @@ namespace MiNET.Net
 			var messageParts = new List<MessagePart>();
 
 			byte[] encodedMessage = message.Encode();
+			//if (Log.IsDebugEnabled && message is McpeBatch)
+			//	Log.Debug($"0x{encodedMessage[0]:x2}\n{Package.HexDump(encodedMessage)}");
 
 			int orderingIndex = 0;
+
+			if (!(message is ConnectedPong) && !(message is DetectLostConnections))
+			{
+				reliability = Reliability.ReliableOrdered;
+			}
 
 			CryptoContext cryptoContext = session.CryptoContext;
 			if (cryptoContext != null && !(message is ConnectedPong) && !(message is DetectLostConnections))
 			{
 				lock (session.EncodeSync)
 				{
-					McpeWrapper wrapper = McpeWrapper.CreateObject();
 					reliability = Reliability.ReliableOrdered;
-					orderingIndex = Interlocked.Increment(ref session.OrderingIndex);
+
+					var isBatch = message is McpeWrapper;
 
 					if (!message.ForceClear && session.CryptoContext.UseEncryption)
 					{
-						wrapper.payload = CryptoUtils.Encrypt(encodedMessage, cryptoContext);
-					}
-					else
-					{
-						wrapper.payload = encodedMessage;
-					}
+						McpeWrapper wrapper = McpeWrapper.CreateObject();
+						if (isBatch)
+						{
+							byte[] tmp = new byte[encodedMessage.Length - 1];
+							Buffer.BlockCopy(encodedMessage, 1, tmp, 0, encodedMessage.Length - 1);
+							encodedMessage = tmp;
+						}
+						else
+						{
+							encodedMessage = Compression.Compress(encodedMessage, 0, encodedMessage.Length, true);
+						}
 
-					encodedMessage = wrapper.Encode();
+						wrapper.payload = CryptoUtils.Encrypt(encodedMessage, cryptoContext);
+						encodedMessage = wrapper.Encode();
+						wrapper.PutPool();
+					}
+					else if (!isBatch)
+					{
+						McpeWrapper wrapper = McpeWrapper.CreateObject();
+						wrapper.payload = Compression.Compress(encodedMessage, 0, encodedMessage.Length, true);
+						encodedMessage = wrapper.Encode();
+						wrapper.PutPool();
+					}
 					//if (Log.IsDebugEnabled)
 					//	Log.Debug($"0x{encodedMessage[0]:x2}\n{Package.HexDump(encodedMessage)}");
-					wrapper.PutPool();
 				}
 			}
 			//if (Log.IsDebugEnabled)
 			//	Log.Debug($"0x{encodedMessage[0]:x2}\n{Package.HexDump(encodedMessage)}");
+
+			if (reliability == Reliability.ReliableOrdered)
+			{
+				orderingIndex = Interlocked.Increment(ref session.OrderingIndex);
+			}
 
 			if (encodedMessage == null) return messageParts;
 
@@ -167,7 +218,7 @@ namespace MiNET.Net
 				Interlocked.CompareExchange(ref session.SplitPartId, 0, short.MaxValue);
 			}
 
-			short splitId = (short)Interlocked.Increment(ref session.SplitPartId);
+			short splitId = (short) Interlocked.Increment(ref session.SplitPartId);
 
 			if (count <= 1)
 			{

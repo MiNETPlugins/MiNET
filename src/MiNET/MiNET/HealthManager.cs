@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Numerics;
 using System.Reflection;
+using System.Threading.Tasks;
 using log4net;
 using MiNET.Entities;
 using MiNET.Items;
@@ -126,15 +127,9 @@ namespace MiNET
 				player.HungerManager.IncreaseExhaustion(0.3f);
 
 				player.SendUpdateAttributes();
-				player.BroadcastEntityEvent();
 			}
-			else
-			{
-				var msg = McpeEntityEvent.CreateObject();
-				msg.entityId = Entity.EntityId;
-				msg.eventId = (byte) (Health <= 0 ? 3 : 2);
-				Entity.Level.RelayBroadcast(msg);
-			}
+
+			Entity.BroadcastEntityEvent();
 
 			if (source != null)
 			{
@@ -179,7 +174,7 @@ namespace MiNET
 			if (player != null)
 			{
 				var knockback = player.DamageCalculator.CalculateKnockback(tool);
-				velocity += Vector3.Normalize(velocity) * new Vector3(knockback * 0.5f, 0.1f, knockback * 0.5f);
+				velocity += Vector3.Normalize(velocity)*new Vector3(knockback*0.5f, 0.1f, knockback*0.5f);
 			}
 
 			Entity.Knockback(velocity);
@@ -210,25 +205,39 @@ namespace MiNET
 			Entity.BroadcastSetEntityData();
 		}
 
+		private object _killSync = new object();
+
 		public virtual void Kill()
 		{
-			if (IsDead) return;
+			lock (_killSync)
+			{
+				if (IsDead) return;
+				IsDead = true;
 
-			IsDead = true;
-			Health = 0;
+				Health = 0;
+			}
+
 			var player = Entity as Player;
 			if (player != null)
 			{
 				player.SendUpdateAttributes();
-				player.BroadcastEntityEvent();
 			}
 
-			Entity.BroadcastSetEntityData();
-			Entity.DespawnEntity();
+			Entity.BroadcastEntityEvent();
 
 			if (player != null)
 			{
-				player.DropInventory();
+				//SendWithDelay(2000, () =>
+				//{
+				//});
+
+				Entity.BroadcastSetEntityData();
+				Entity.DespawnEntity();
+
+				if (!Config.GetProperty("KeepInventory", false))
+				{
+					player.DropInventory();
+				}
 
 				var mcpeRespawn = McpeRespawn.CreateObject();
 				mcpeRespawn.x = player.SpawnPosition.X;
@@ -238,17 +247,33 @@ namespace MiNET
 			}
 			else
 			{
-				var drops = Entity.GetDrops();
-				foreach (var drop in drops)
+				// This is semi-good, but we need to give the death-animation time to play.
+
+				SendWithDelay(2000, () =>
 				{
-					Entity.Level.DropItem(Entity.KnownPosition.ToVector3(), drop);
-				}
+					Entity.BroadcastSetEntityData();
+					Entity.DespawnEntity();
+
+					if (LastDamageSource is Player)
+					{
+						var drops = Entity.GetDrops();
+						foreach (var drop in drops)
+						{
+							Entity.Level.DropItem(Entity.KnownPosition.ToVector3(), drop);
+						}
+					}
+				});
 			}
+		}
+
+		private async Task SendWithDelay(int delay, Action action)
+		{
+			await Task.Delay(delay);
+			action();
 		}
 
 		public virtual void ResetHealth()
 		{
-			IsInvulnerable = false;
 			Health = MaxHealth;
 			Air = MaxAir;
 			IsOnFire = false;
@@ -263,11 +288,18 @@ namespace MiNET
 
 		public virtual void OnTick()
 		{
-			if (CooldownTick > 0) CooldownTick--;
-
 			if (!Entity.IsSpawned) return;
 
 			if (IsDead) return;
+
+			if (CooldownTick > 0)
+			{
+				CooldownTick--;
+			}
+			else
+			{
+				LastDamageSource = null;
+			}
 
 			if (IsInvulnerable) Health = MaxHealth;
 
@@ -299,13 +331,6 @@ namespace MiNET
 				}
 
 				Entity.BroadcastSetEntityData();
-
-				if (IsOnFire)
-				{
-					IsOnFire = false;
-					FireTick = 0;
-					Entity.BroadcastSetEntityData();
-				}
 			}
 			else
 			{
@@ -318,7 +343,14 @@ namespace MiNET
 				}
 			}
 
-			if (IsInSolid(Entity.KnownPosition))
+			if (IsOnFire && (Entity.IsInWater || IsStandingInWater(Entity.KnownPosition)))
+			{
+				IsOnFire = false;
+				FireTick = 0;
+				Entity.BroadcastSetEntityData();
+			}
+
+			if (IsInOpaque(Entity.KnownPosition))
 			{
 				if (SuffocationTicks <= 0)
 				{
@@ -374,11 +406,11 @@ namespace MiNET
 					Entity.BroadcastSetEntityData();
 				}
 
-				if (Math.Abs(FireTick)%20 == 0)
+				if (FireTick%20 == 0)
 				{
-					if (Entity is Player)
+					var player = Entity as Player;
+					if (player != null)
 					{
-						Player player = (Player) Entity;
 						player.DamageCalculator.CalculatePlayerDamage(null, player, null, 1, DamageCause.FireTick);
 						TakeHit(null, 1, DamageCause.FireTick);
 					}
@@ -391,8 +423,10 @@ namespace MiNET
 			}
 		}
 
-		private bool IsInWater(PlayerLocation playerPosition)
+		public bool IsInWater(PlayerLocation playerPosition)
 		{
+			if (playerPosition.Y < 0 || playerPosition.Y > 255) return false;
+
 			float y = playerPosition.Y + 1.62f;
 
 			BlockCoordinates waterPos = new BlockCoordinates
@@ -406,28 +440,46 @@ namespace MiNET
 
 			if (block == null || (block.Id != 8 && block.Id != 9)) return false;
 
-			return y < Math.Floor(y) + 1 - ((1/9) - 0.1111111);
+			return y < Math.Floor(y) + 1 - ((1f/9f) - 0.1111111);
+		}
+
+		public bool IsStandingInWater(PlayerLocation playerPosition)
+		{
+			if (playerPosition.Y < 0 || playerPosition.Y > 255) return false;
+
+			var block = Entity.Level.GetBlock(playerPosition);
+
+			if (block == null || (block.Id != 8 && block.Id != 9)) return false;
+
+			return playerPosition.Y < Math.Floor(playerPosition.Y) + 1 - ((1f/9f) - 0.1111111);
 		}
 
 		private bool IsInLava(PlayerLocation playerPosition)
 		{
+			if (playerPosition.Y < 0 || playerPosition.Y > 255) return false;
+
 			var block = Entity.Level.GetBlock(playerPosition);
 
 			if (block == null || (block.Id != 10 && block.Id != 11)) return false;
 
-			return playerPosition.Y < Math.Floor(playerPosition.Y) + 1 - ((1/9) - 0.1111111);
+			return playerPosition.Y < Math.Floor(playerPosition.Y) + 1 - ((1f/9f) - 0.1111111);
 		}
 
-		private bool IsInSolid(PlayerLocation playerPosition)
+		private bool IsInOpaque(PlayerLocation playerPosition)
 		{
+			if (playerPosition.Y < 0 || playerPosition.Y > 255) return false;
+
 			BlockCoordinates solidPos = (BlockCoordinates) playerPosition;
-			solidPos.Y += 1;
+			if (Entity.Height >= 1)
+			{
+				solidPos.Y += 1;
+			}
 
 			var block = Entity.Level.GetBlock(solidPos);
 
 			if (block == null) return false;
 
-			return block.IsSolid;
+			return !block.IsTransparent;
 		}
 
 		public static string GetDescription(Enum value)

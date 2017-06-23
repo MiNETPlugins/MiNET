@@ -355,7 +355,7 @@ PU9A3CHMdEcdw/MEAjBBO1lId8KOCh9UZunsSMfqXiVurpzmhWd6VYZ/32G+M+Mh
 			Assert.AreEqual(new Guid("af6f7c5e-fcea-3e43-bf3a-e005e400e578").ToString(), "af6f7c5e-fcea-3e43-bf3a-e005e400e578");
 		}
 
-		[Test, Ignore]
+		[Test, Ignore("")]
 		public void TestRealDecrytp()
 		{
 			// YFtS5MGIU/UQ2w2n3RdqMoBcHOzqEQqISOyKD+W9Prk=
@@ -405,11 +405,11 @@ PU9A3CHMdEcdw/MEAjBBO1lId8KOCh9UZunsSMfqXiVurpzmhWd6VYZ/32G+M+Mh
 
 						Package message = PackageFactory.CreatePackage(clearBytes[0], clearBytes, "mcpe");
 						Assert.NotNull(message);
-						Assert.AreEqual(typeof (McpeBatch), message.GetType());
+						Assert.AreEqual(typeof (McpeWrapper), message.GetType());
 
-						List<Package> messages = HandleBatch((McpeBatch) message);
-						McpeClientMagic magic = (McpeClientMagic) messages.FirstOrDefault();
-						Assert.AreEqual(typeof (McpeClientMagic), magic?.GetType());
+						List<Package> messages = HandleBatch((McpeWrapper) message);
+						McpeClientToServerHandshake magic = (McpeClientToServerHandshake) messages.FirstOrDefault();
+						Assert.AreEqual(typeof (McpeClientToServerHandshake), magic?.GetType());
 
 						//Hashing - Checksum - Validation
 						MemoryStream hashStream = new MemoryStream();
@@ -426,7 +426,7 @@ PU9A3CHMdEcdw/MEAjBBO1lId8KOCh9UZunsSMfqXiVurpzmhWd6VYZ/32G+M+Mh
 			}
 		}
 
-		private List<Package> HandleBatch(McpeBatch batch)
+		private List<Package> HandleBatch(McpeWrapper batch)
 		{
 			var messages = new List<Package>();
 

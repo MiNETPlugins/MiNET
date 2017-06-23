@@ -56,7 +56,7 @@ namespace MiNET.Entities.World
 		public override void SpawnToPlayers(Player[] players)
 		{
 			McpeAddItemEntity mcpeAddItemEntity = McpeAddItemEntity.CreateObject();
-			mcpeAddItemEntity.entityId = EntityId;
+			mcpeAddItemEntity.entityIdSelf = EntityId;
 			mcpeAddItemEntity.runtimeEntityId = EntityId;
 			mcpeAddItemEntity.item = GetItemStack();
 			mcpeAddItemEntity.x = KnownPosition.X;
@@ -76,24 +76,24 @@ namespace MiNET.Entities.World
 			{
 				// Object was resting and now someone removed the block on which it was resting
 				// or someone places a block over it.
-				if (IsInGround(KnownPosition))
+				if (IsMobInGround(KnownPosition))
 				{
-					Velocity += new Vector3(0, (float)Gravity, 0);
+					Velocity += new Vector3(0, (float) Gravity, 0);
 				}
 				else
 				{
-					bool onGround = IsOnGround(KnownPosition);
-					if (!onGround) Velocity -= new Vector3(0, (float)Gravity, 0);
+					bool onGround = IsMobOnGround(KnownPosition);
+					if (!onGround) Velocity -= new Vector3(0, (float) Gravity, 0);
 				}
 			}
 
 			if (Velocity.Length() > 0.01)
 			{
-				bool onGroundBefore = IsOnGround(KnownPosition);
+				bool onGroundBefore = IsMobOnGround(KnownPosition);
 
-				if (IsInGround(KnownPosition))
+				if (IsMobInGround(KnownPosition))
 				{
-					Velocity += new Vector3(0, (float)Gravity, 0);
+					Velocity += new Vector3(0, (float) Gravity, 0);
 					KnownPosition.X += Velocity.X;
 					KnownPosition.Y += Velocity.Y;
 					KnownPosition.Z += Velocity.Z;
@@ -117,7 +117,7 @@ namespace MiNET.Entities.World
 					CheckBlockAhead();
 				}
 
-				bool onGround = IsOnGround(KnownPosition);
+				bool onGround = IsMobOnGround(KnownPosition);
 
 				if (!onGroundBefore && onGround)
 				{
@@ -145,7 +145,6 @@ namespace MiNET.Entities.World
 				KnownPosition.Y += (float) Velocity.Y;
 				KnownPosition.Z += (float) Velocity.Z;
 
-				Log.Warn("Velocity 0");
 				Velocity = Vector3.Zero;
 				LastUpdatedTime = DateTime.UtcNow;
 				NoAi = true;
@@ -170,26 +169,23 @@ namespace MiNET.Entities.World
 			var players = Level.GetSpawnedPlayers();
 			foreach (var player in players)
 			{
-				if (KnownPosition.DistanceTo(player.KnownPosition) <= 2)
+				if (player.GameMode != GameMode.Spectator && KnownPosition.DistanceTo(player.KnownPosition) <= 2)
 				{
-					if (player.GameMode == GameMode.Survival)
 					{
-						{
-							var takeItemEntity = McpeTakeItemEntity.CreateObject();
-							takeItemEntity.entityId = EntityId;
-							takeItemEntity.target = player.EntityId;
-							Level.RelayBroadcast(player, takeItemEntity);
-						}
-						{
-							var takeItemEntity = McpeTakeItemEntity.CreateObject();
-							takeItemEntity.entityId = EntityId;
-							takeItemEntity.target = 0;
-							player.SendPackage(takeItemEntity);
-						}
-
-						DespawnEntity();
-						break;
+						var takeItemEntity = McpeTakeItemEntity.CreateObject();
+						takeItemEntity.runtimeEntityId = EntityId;
+						takeItemEntity.target = player.EntityId;
+						Level.RelayBroadcast(player, takeItemEntity);
 					}
+					{
+						var takeItemEntity = McpeTakeItemEntity.CreateObject();
+						takeItemEntity.runtimeEntityId = EntityId;
+						takeItemEntity.target = EntityManager.EntityIdSelf;
+						player.SendPackage(takeItemEntity);
+					}
+
+					DespawnEntity();
+					break;
 				}
 			}
 		}

@@ -1,3 +1,28 @@
+#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is Niclas Olofsson.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -27,9 +52,6 @@ namespace MiNET.Net
 
 		[JsonIgnore]
 		public bool NoBatch { get; set; }
-
-		[JsonIgnore]
-		public DateTime? ValidUntil { get; set; }
 
 		[JsonIgnore] public Reliability Reliability = Reliability.Unreliable;
 		[JsonIgnore] public int ReliableMessageNumber = 0;
@@ -314,9 +336,9 @@ namespace MiNET.Net
 
 		public void Write(float value)
 		{
-			byte[] bytes = BitConverter.GetBytes(value);
-
 			_writer.Write(value);
+
+			//byte[] bytes = BitConverter.GetBytes(value);
 			//_writer.Write(bytes[3]);
 			//_writer.Write(bytes[2]);
 			//_writer.Write(bytes[1]);
@@ -483,15 +505,21 @@ namespace MiNET.Net
 			WriteUnsignedVarInt((uint) records.Count);
 			foreach (BlockCoordinates coord in records)
 			{
-				WriteVarInt(coord.X);
-				WriteVarInt(coord.Y);
-				WriteVarInt(coord.Z);
+				Write(coord);
 			}
 		}
 
 		public Records ReadRecords()
 		{
-			return new Records();
+			var records = new Records();
+			uint count = ReadUnsignedVarInt();
+			for (int i = 0; i < count; i++)
+			{
+				var coord = ReadBlockCoordinates();
+				records.Add(coord);
+			}
+
+			return records;
 		}
 
 		public void Write(PlayerLocation location)
@@ -499,9 +527,10 @@ namespace MiNET.Net
 			Write(location.X);
 			Write(location.Y);
 			Write(location.Z);
-			Write((byte) (location.Pitch*0.71)); // 256/360
-			Write((byte) (location.HeadYaw*0.71)); // 256/360
-			Write((byte) (location.Yaw*0.71)); // 256/360
+			var d = 256f/360f;
+			Write((byte) Math.Round(location.Pitch*d)); // 256/360
+			Write((byte) Math.Round(location.HeadYaw*d)); // 256/360
+			Write((byte) Math.Round(location.Yaw*d)); // 256/360
 		}
 
 		public PlayerLocation ReadPlayerLocation()
@@ -666,11 +695,11 @@ namespace MiNET.Net
 
 			if (metadata == null)
 			{
-				WriteVarInt(0);
+				WriteUnsignedVarInt(0);
 				return;
 			}
 
-			WriteVarInt(metadata.Count);
+			WriteUnsignedVarInt((uint) metadata.Count);
 
 			for (int i = 0; i < metadata.Count; i++)
 			{
@@ -701,7 +730,9 @@ namespace MiNET.Net
 			}
 
 			WriteSignedVarInt(stack.Id);
-			WriteSignedVarInt((stack.Metadata << 8) + (stack.Count & 0xff));
+			short metadata = stack.Metadata;
+			if (metadata == -1) metadata = short.MaxValue;
+			WriteSignedVarInt((metadata << 8) + (stack.Count & 0xff));
 
 			if (signItem)
 			{
@@ -718,25 +749,40 @@ namespace MiNET.Net
 			{
 				Write((short) 0);
 			}
+
+			WriteSignedVarInt(0);
+			WriteSignedVarInt(0);
 		}
 
 		public Item ReadItem()
 		{
-			int id = (int) ReadSignedVarInt();
+			int id = ReadSignedVarInt();
 			if (id <= 0)
 			{
 				return new ItemAir();
 			}
 
-			int tmp = (int) ReadSignedVarInt();
+			int tmp = ReadSignedVarInt();
 			short metadata = (short) (tmp >> 8);
+			if (metadata == short.MaxValue) metadata = -1;
 			byte count = (byte) (tmp & 0xff);
 			Item stack = ItemFactory.GetItem((short) id, metadata, count);
 
-			int nbtLen = (int) _reader.ReadInt16(); // NbtLen
+			int nbtLen = _reader.ReadInt16(); // NbtLen
 			if (nbtLen > 0)
 			{
 				stack.ExtraData = ReadNbt().NbtFile.RootTag;
+			}
+
+			var canPlace = ReadSignedVarInt();
+			for (int i = 0; i < canPlace; i++)
+			{
+				ReadString();
+			}
+			var canBreak = ReadSignedVarInt();
+			for (int i = 0; i < canBreak; i++)
+			{
+				ReadString();
 			}
 
 			return stack;
@@ -765,19 +811,6 @@ namespace MiNET.Net
 			return MetadataDictionary.FromStream(_reader);
 		}
 
-		public void Write(PlayerAttributes attributes)
-		{
-			WriteUnsignedVarInt((uint) attributes.Count);
-			foreach (PlayerAttribute attribute in attributes.Values)
-			{
-				Write(attribute.MinValue);
-				Write(attribute.MaxValue);
-				Write(attribute.Value);
-				Write(attribute.Default); // unknown
-				Write(attribute.Name);
-			}
-		}
-
 		public PlayerAttributes ReadPlayerAttributes()
 		{
 			var attributes = new PlayerAttributes();
@@ -799,11 +832,97 @@ namespace MiNET.Net
 			return attributes;
 		}
 
+		public void Write(PlayerAttributes attributes)
+		{
+			WriteUnsignedVarInt((uint) attributes.Count);
+			foreach (PlayerAttribute attribute in attributes.Values)
+			{
+				Write(attribute.MinValue);
+				Write(attribute.MaxValue);
+				Write(attribute.Value);
+				Write(attribute.Default); // unknown
+				Write(attribute.Name);
+			}
+		}
+
+
+		public GameRules ReadGameRules()
+		{
+			GameRules gameRules = new GameRules();
+
+			int count = ReadVarInt();
+			for (int i = 0; i < count; i++)
+			{
+				string name = ReadString();
+				byte type = ReadByte();
+				switch (type)
+				{
+					case 1:
+					{
+						GameRule<bool> rule = new GameRule<bool>();
+						rule.Name = name;
+						rule.Value = ReadBool();
+						gameRules.Add(rule.Name, rule);
+						break;
+					}
+					case 2:
+					{
+						GameRule<int> rule = new GameRule<int>();
+						rule.Name = name;
+						rule.Value = ReadVarInt();
+						gameRules.Add(rule.Name, rule);
+						break;
+					}
+					case 3:
+					{
+						GameRule<float> rule = new GameRule<float>();
+						rule.Name = name;
+						rule.Value = ReadFloat();
+						gameRules.Add(rule.Name, rule);
+						break;
+					}
+				}
+			}
+
+			return gameRules;
+		}
+
+		public void Write(GameRules gameRules)
+		{
+			if (gameRules == null)
+			{
+				WriteVarInt(0);
+				return;
+			}
+
+			WriteVarInt(gameRules.Count);
+			foreach (var rule in gameRules)
+			{
+				var value = rule.Value;
+				Write(rule.Key);
+				if (value is GameRule<bool>)
+				{
+					Write((byte) 1);
+					Write(((GameRule<bool>) value).Value);
+				}
+				else if (value is GameRule<int>)
+				{
+					Write((byte) 2);
+					WriteVarInt(((GameRule<int>) value).Value);
+				}
+				else if (value is GameRule<float>)
+				{
+					Write((byte) 3);
+					Write(((GameRule<float>) value).Value);
+				}
+			}
+		}
+
 		public void Write(EntityAttributes attributes)
 		{
 			if (attributes == null)
 			{
-				WriteVarInt(0);
+				WriteUnsignedVarInt(0);
 				return;
 			}
 
@@ -900,28 +1019,36 @@ namespace MiNET.Net
 			if (packInfos == null)
 			{
 				_writer.Write((short) 0); // LE
+				//WriteVarInt(0);
 				return;
 			}
 
 			_writer.Write((short) packInfos.Count); // LE
+			//WriteVarInt(packInfos.Count);
 			foreach (var info in packInfos)
 			{
 				Write(info.PackIdVersion.Id);
 				Write(info.PackIdVersion.Version);
-				Write(info.Unknown);
+				Write(info.Size);
+				Write("");
 			}
 		}
 
 		public ResourcePackInfos ReadResourcePackInfos()
 		{
 			int count = _reader.ReadInt16(); // LE
+			//int count = ReadVarInt(); // LE
 
 			var packInfos = new ResourcePackInfos();
 			for (int i = 0; i < count; i++)
 			{
 				var info = new ResourcePackInfo();
-				info.PackIdVersion = new PackIdVersion() {Id = ReadString(), Version = ReadString()};
-				info.Unknown = ReadUlong();
+				var id = ReadString();
+				var version = ReadString();
+				var size = ReadUlong();
+				var unknown = ReadString();
+				info.PackIdVersion = new PackIdVersion {Id = id, Version = version};
+				info.Size = size;
 				packInfos.Add(info);
 			}
 
@@ -932,11 +1059,10 @@ namespace MiNET.Net
 		{
 			if (packInfos == null)
 			{
-				_writer.Write((short) 0); // LE
+				Write((short) 0); // LE
 				return;
 			}
-
-			_writer.Write((short) packInfos.Count); // LE
+			Write((short) packInfos.Count); // LE
 			foreach (var info in packInfos)
 			{
 				Write(info.Id);
@@ -946,16 +1072,48 @@ namespace MiNET.Net
 
 		public ResourcePackIdVersions ReadResourcePackIdVersions()
 		{
-			int count = _reader.ReadInt16(); // LE
+			//int count = _reader.ReadInt16(); // LE
+			int count = ReadShort(); // LE
 
 			var packInfos = new ResourcePackIdVersions();
 			for (int i = 0; i < count; i++)
 			{
-				var info = new PackIdVersion() {Id = ReadString(), Version = ReadString()};
+				var id = ReadString();
+				var version = ReadString();
+				var info = new PackIdVersion {Id = id, Version = version};
 				packInfos.Add(info);
 			}
 
 			return packInfos;
+		}
+
+		public void Write(ResourcePackIds ids)
+		{
+			if (ids == null)
+			{
+				Write((short) 0);
+				return;
+			}
+			Write((short) ids.Count);
+
+			foreach (var id in ids)
+			{
+				Write(id);
+			}
+		}
+
+		public ResourcePackIds ReadResourcePackIds()
+		{
+			int count = ReadShort();
+
+			var ids = new ResourcePackIds();
+			for (int i = 0; i < count; i++)
+			{
+				var id = ReadString();
+				ids.Add(id);
+			}
+
+			return ids;
 		}
 
 		public void Write(Skin skin)
@@ -1000,6 +1158,13 @@ namespace MiNET.Net
 
 			return skin;
 		}
+
+		const byte Shapeless = 0;
+		const byte Shaped = 1;
+		const byte Furnace = 2;
+		const byte FurnaceData = 3;
+		const byte Multi = 4;
+		const byte ShulkerBox = 5;
 
 		public void Write(Recipes recipes)
 		{
@@ -1092,9 +1257,8 @@ namespace MiNET.Net
 					break;
 				}
 
-				if (recipeType == 0)
+				if (recipeType == Shapeless || recipeType == ShulkerBox)
 				{
-					//const ENTRY_SHAPELESS = 0;
 					ShapelessRecipe recipe = new ShapelessRecipe();
 					int ingrediensCount = ReadVarInt(); // 
 					for (int j = 0; j < ingrediensCount; j++)
@@ -1107,9 +1271,8 @@ namespace MiNET.Net
 					recipes.Add(recipe);
 					//Log.Error("Read shapeless recipe");
 				}
-				else if (recipeType == 1)
+				else if (recipeType == Shaped)
 				{
-					//const ENTRY_SHAPED = 1;
 					int width = ReadSignedVarInt(); // Width
 					int height = ReadSignedVarInt(); // Height
 					ShapedRecipe recipe = new ShapedRecipe(width, height);
@@ -1131,9 +1294,8 @@ namespace MiNET.Net
 					recipes.Add(recipe);
 					//Log.Error("Read shaped recipe");
 				}
-				else if (recipeType == 2)
+				else if (recipeType == Furnace)
 				{
-					//const ENTRY_FURNACE = 2;
 					SmeltingRecipe recipe = new SmeltingRecipe();
 					//short meta = (short) ReadVarInt(); // input (with metadata) 
 					short id = (short) ReadSignedVarInt(); // input (with metadata) 
@@ -1144,7 +1306,7 @@ namespace MiNET.Net
 					//Log.Error("Read furnace recipe");
 					//Log.Error($"Input={id}, meta={""} Item={result.Id}, Meta={result.Metadata}");
 				}
-				else if (recipeType == 3)
+				else if (recipeType == FurnaceData)
 				{
 					//const ENTRY_FURNACE_DATA = 3;
 					SmeltingRecipe recipe = new SmeltingRecipe();
@@ -1157,10 +1319,9 @@ namespace MiNET.Net
 					//Log.Error("Read smelting recipe");
 					//Log.Error($"Input={id}, meta={meta} Item={result.Id}, Meta={result.Metadata}");
 				}
-				else if (recipeType == 4)
+				else if (recipeType == Multi)
 				{
-					//const ENTRY_ENCHANT_LIST = 4;
-					Log.Error("Reading ENCHANT_LIST");
+					Log.Error("Reading MULTI");
 
 					ReadUUID();
 				}
@@ -1381,8 +1542,6 @@ namespace MiNET.Net
 			NoBatch = false;
 			ForceClear = false;
 
-			ValidUntil = null;
-
 			_encodedMessage = null;
 			_writer.Flush();
 			_buffer.SetLength(0);
@@ -1467,13 +1626,28 @@ namespace MiNET.Net
 				byte[] lineBytes = bytes.Skip(line).Take(bytesPerLine).ToArray();
 				if (printLineCount) sb.AppendFormat("{0:x8} ", line);
 				sb.Append(string.Join(" ", lineBytes.Select(b => b.ToString("x2"))
-					.ToArray()).PadRight(bytesPerLine*3));
+						.ToArray())
+					.PadRight(bytesPerLine*3));
 				sb.Append(" ");
 				sb.Append(new string(lineBytes.Select(b => b < 32 ? '.' : (char) b)
 					.ToArray()));
 				sb.AppendLine();
 			}
 			return sb.ToString();
+		}
+
+		public static string ToJson(Package message)
+		{
+			var jsonSerializerSettings = new JsonSerializerSettings
+			{
+				PreserveReferencesHandling = PreserveReferencesHandling.Arrays,
+
+				Formatting = Formatting.Indented,
+			};
+			jsonSerializerSettings.Converters.Add(new NbtIntConverter());
+			jsonSerializerSettings.Converters.Add(new NbtStringConverter());
+
+			return JsonConvert.SerializeObject(message, jsonSerializerSettings);
 		}
 	}
 

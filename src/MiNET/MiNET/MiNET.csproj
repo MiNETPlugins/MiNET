@@ -33,31 +33,31 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="AStarNavigator, Version=1.0.63.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\AStarNavigator.1.0.63\lib\net35\AStarNavigator.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="fNbt, Version=0.6.9.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\MiNET.fnbt.0.6.9\lib\net35-client\fNbt.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="jose-jwt, Version=1.9.3.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\jose-jwt.1.9.3\lib\4.0\jose-jwt.dll</HintPath>
+    <Reference Include="jose-jwt, Version=2.3.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\jose-jwt.2.3.0\lib\net461\jose-jwt.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="LibNoise">
       <HintPath>..\packages\LibNoise.0.2\lib\NET45\LibNoise.dll</HintPath>
     </Reference>
-    <Reference Include="log4net, Version=1.2.15.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
-      <HintPath>..\packages\log4net.2.0.5\lib\net45-full\log4net.dll</HintPath>
+    <Reference Include="log4net, Version=2.0.8.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
+      <HintPath>..\packages\log4net.2.0.8\lib\net45-full\log4net.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.AspNet.Identity.Core, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Microsoft.AspNet.Identity.Core.2.2.1\lib\net45\Microsoft.AspNet.Identity.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.IO.RecyclableMemoryStream, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.IO.RecyclableMemoryStream.1.1.0.0\lib\net45\Microsoft.IO.RecyclableMemoryStream.dll</HintPath>
+    <Reference Include="Microsoft.IO.RecyclableMemoryStream, Version=1.2.2.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.IO.RecyclableMemoryStream.1.2.2\lib\net45\Microsoft.IO.RecyclableMemoryStream.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Newtonsoft.Json, Version=9.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+    <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.10.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="SharpAvi, Version=2.1.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -70,6 +70,7 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Numerics.Vectors" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -78,6 +79,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AlwaysFullHungerManager.cs" />
+    <Compile Include="BlockEntities\BedBlockEntity.cs" />
     <Compile Include="BlockEntities\BlockEntity.cs" />
     <Compile Include="BlockEntities\BlockEntityFactory.cs" />
     <Compile Include="BlockEntities\ChestBlockEntity.cs" />
@@ -100,11 +102,14 @@
     <Compile Include="Blocks\BirchDoor.cs" />
     <Compile Include="Blocks\BirchFenceGate.cs" />
     <Compile Include="Blocks\BirchWoodStairs.cs" />
+    <Compile Include="Blocks\BlackGlazedTerracotta.cs" />
     <Compile Include="Blocks\BlockStairs.cs" />
+    <Compile Include="Blocks\BlueGlazedTerracotta.cs" />
     <Compile Include="Blocks\BookShelf.cs" />
     <Compile Include="Blocks\BrewingStand.cs" />
     <Compile Include="Blocks\Bricks.cs" />
     <Compile Include="Blocks\BrickStairs.cs" />
+    <Compile Include="Blocks\BrownGlazedTerracotta.cs" />
     <Compile Include="Blocks\BrownMushroom.cs" />
     <Compile Include="Blocks\BrownMushroomBlock.cs" />
     <Compile Include="Blocks\Button.cs" />
@@ -119,7 +124,10 @@
     <Compile Include="Blocks\CobblestoneWall.cs" />
     <Compile Include="Blocks\Cobweb.cs" />
     <Compile Include="Blocks\Cocoa.cs" />
+    <Compile Include="Blocks\Concrete.cs" />
+    <Compile Include="Blocks\ConcretePowder.cs" />
     <Compile Include="Blocks\Crops.cs" />
+    <Compile Include="Blocks\CyanGlazedTerracotta.cs" />
     <Compile Include="Blocks\DarkOakDoor.cs" />
     <Compile Include="Blocks\DoubleRedSandstoneSlab.cs" />
     <Compile Include="Blocks\DragonEgg.cs" />
@@ -129,22 +137,34 @@
     <Compile Include="Blocks\EndGateway.cs" />
     <Compile Include="Blocks\EndPortal.cs" />
     <Compile Include="Blocks\EndRod.cs" />
+    <Compile Include="Blocks\FrostedIce.cs" />
+    <Compile Include="Blocks\GlazedTerracotta.cs" />
+    <Compile Include="Blocks\GrayGlazedTerracotta.cs" />
+    <Compile Include="Blocks\GreenGlazedTerracotta.cs" />
     <Compile Include="Blocks\Hopper.cs" />
     <Compile Include="Blocks\JungleDoor.cs" />
+    <Compile Include="Blocks\LightBlueGlazedTerracotta.cs" />
+    <Compile Include="Blocks\LimeGlazedTerracotta.cs" />
     <Compile Include="Blocks\LitRedstoneOre.cs" />
+    <Compile Include="Blocks\MagentaGlazedTerracotta.cs" />
     <Compile Include="Blocks\MelonStem.cs" />
     <Compile Include="Blocks\Observer.cs" />
+    <Compile Include="Blocks\OrangeGlazedTerracotta.cs" />
+    <Compile Include="Blocks\PinkGlazedTerracotta.cs" />
     <Compile Include="Blocks\Piston.cs" />
     <Compile Include="Blocks\PistonHead.cs" />
     <Compile Include="Blocks\PoweredComparator.cs" />
     <Compile Include="Blocks\Prismarine.cs" />
+    <Compile Include="Blocks\PurpleGlazedTerracotta.cs" />
     <Compile Include="Blocks\PurPur.cs" />
     <Compile Include="Blocks\PumpkinStem.cs" />
     <Compile Include="Blocks\PurPurStairs.cs" />
+    <Compile Include="Blocks\RedGlazedTerracotta.cs" />
     <Compile Include="Blocks\RedSandstone.cs" />
-    <Compile Include="Blocks\RedSandstoneSlab.cs" />
+    <Compile Include="Blocks\StoneSlab2.cs" />
     <Compile Include="Blocks\RedSandstoneStairs.cs" />
     <Compile Include="Blocks\SeaLantern.cs" />
+    <Compile Include="Blocks\SilverGlazedTerracotta.cs" />
     <Compile Include="Blocks\Slime.cs" />
     <Compile Include="Blocks\SpruceDoor.cs" />
     <Compile Include="Blocks\StainedGlass.cs" />
@@ -153,6 +173,7 @@
     <Compile Include="Blocks\UnpoweredComparator.cs" />
     <Compile Include="Blocks\Wheat.cs" />
     <Compile Include="Blocks\RedMushroom.cs" />
+    <Compile Include="Blocks\WhiteGlazedTerracotta.cs" />
     <Compile Include="Blocks\YellowFlower.cs" />
     <Compile Include="Blocks\DarkOakFenceGate.cs" />
     <Compile Include="Blocks\DaylightDetector.cs" />
@@ -291,6 +312,7 @@
     <Compile Include="Blocks\WoodSlab.cs" />
     <Compile Include="Blocks\Tnt.cs" />
     <Compile Include="Blocks\Wool.cs" />
+    <Compile Include="Blocks\YellowGlazedTerracotta.cs" />
     <Compile Include="CertificateChain.cs" />
     <Compile Include="CertificateData.cs" />
     <Compile Include="ConnectionState.cs" />
@@ -320,16 +342,43 @@
     <Compile Include="Effects\WaterBreathing.cs" />
     <Compile Include="Effects\Weakness.cs" />
     <Compile Include="Effects\Wither.cs" />
+    <Compile Include="Entities\Agent.cs" />
+    <Compile Include="Entities\Behaviors\EatBlockBehavior.cs" />
+    <Compile Include="Entities\Behaviors\FindAttackableTargetBehavior.cs" />
+    <Compile Include="Entities\Behaviors\FollowOwnerBehavior.cs" />
+    <Compile Include="Entities\Behaviors\HorseEatBlockBehavior.cs" />
+    <Compile Include="Entities\Behaviors\HurtByTargetBehavior.cs" />
+    <Compile Include="Entities\Behaviors\IBehavior.cs" />
+    <Compile Include="Entities\Behaviors\JumpAttackBehavior.cs" />
+    <Compile Include="Entities\Behaviors\LookAtPlayerBehavior.cs" />
+    <Compile Include="Entities\Behaviors\MeeleAttackBehavior.cs" />
+    <Compile Include="Entities\Behaviors\MobController.cs" />
+    <Compile Include="Entities\Behaviors\OwnerHurtByTargetBehavior.cs" />
+    <Compile Include="Entities\Behaviors\OwnerHurtTargetBehavior.cs" />
+    <Compile Include="Entities\Behaviors\PanicBehavior.cs" />
+    <Compile Include="Entities\Behaviors\PathFinder.cs" />
+    <Compile Include="Entities\Behaviors\RandomLookaroundBehavior.cs" />
+    <Compile Include="Entities\Behaviors\SittingBehavior.cs" />
+    <Compile Include="Entities\Behaviors\StrollBehavior.cs" />
+    <Compile Include="Entities\Behaviors\TemptedBehavior.cs" />
+    <Compile Include="Entities\BossBar.cs" />
     <Compile Include="Entities\EntitySpawnManager.cs" />
+    <Compile Include="Entities\Hologram.cs" />
     <Compile Include="Entities\Hostile\Dragon.cs" />
     <Compile Include="Entities\Hostile\ElderGuardian.cs" />
+    <Compile Include="Entities\Hostile\Evoker.cs" />
     <Compile Include="Entities\Hostile\Guardian.cs" />
-    <Compile Include="Entities\Hostile\Horse.cs" />
     <Compile Include="Entities\Hostile\Husk.cs" />
     <Compile Include="Entities\Hostile\Shulker.cs" />
     <Compile Include="Entities\Hostile\SkeletonHorse.cs" />
     <Compile Include="Entities\Hostile\Stray.cs" />
+    <Compile Include="Entities\Hostile\Vex.cs" />
+    <Compile Include="Entities\Hostile\Vindicator.cs" />
+    <Compile Include="Entities\Hostile\Wither.cs" />
     <Compile Include="Entities\Hostile\WitherSkeleton.cs" />
+    <Compile Include="Entities\Npc.cs" />
+    <Compile Include="Entities\Passive\Horse.cs" />
+    <Compile Include="Entities\Passive\Llama.cs" />
     <Compile Include="Entities\Passive\PolarBear.cs" />
     <Compile Include="Entities\Projectiles\Arrow.cs" />
     <Compile Include="Entities\Projectiles\Egg.cs" />
@@ -398,14 +447,16 @@
     <Compile Include="Items\ItemBed.cs" />
     <Compile Include="Items\ItemBeetroot.cs" />
     <Compile Include="Items\ItemBeetrootSeeds.cs" />
+    <Compile Include="Items\ItemBone.cs" />
     <Compile Include="Items\ItemBow.cs" />
     <Compile Include="Items\ItemBread.cs" />
     <Compile Include="Items\ItemCarrot.cs" />
+    <Compile Include="Items\ItemCauldron.cs" />
     <Compile Include="Items\ItemChest.cs" />
     <Compile Include="Items\ItemCoal.cs" />
     <Compile Include="Items\ItemCommand.cs" />
     <Compile Include="Items\ItemCompass.cs" />
-    <Compile Include="Items\ItemCoockedChicken.cs" />
+    <Compile Include="Items\ItemCookedChicken.cs" />
     <Compile Include="Items\ItemCookedPorkshop.cs" />
     <Compile Include="Items\ItemCookie.cs" />
     <Compile Include="Items\ItemDiamond.cs" />
@@ -419,6 +470,7 @@
     <Compile Include="Items\ItemDiamondLeggings.cs" />
     <Compile Include="Items\ItemDiamondSword.cs" />
     <Compile Include="Items\ItemEgg.cs" />
+    <Compile Include="Items\ItemElytra.cs" />
     <Compile Include="Items\ItemEmptyMap.cs" />
     <Compile Include="Items\ItemEnchantingTable.cs" />
     <Compile Include="Items\ItemFurnace.cs" />
@@ -454,6 +506,8 @@
     <Compile Include="Items\ItemMap.cs" />
     <Compile Include="Items\ItemMelonSlice.cs" />
     <Compile Include="Items\ItemMobHead.cs" />
+    <Compile Include="Items\ItemMuttonCooked.cs" />
+    <Compile Include="Items\ItemMuttonRaw.cs" />
     <Compile Include="Items\ItemPotato.cs" />
     <Compile Include="Items\ItemPotion.cs" />
     <Compile Include="Items\ItemPumpkinPie.cs" />
@@ -463,7 +517,7 @@
     <Compile Include="Items\ItemSlab.cs" />
     <Compile Include="Items\ItemSnowball.cs" />
     <Compile Include="Items\ItemSpawnEgg.cs" />
-    <Compile Include="Items\ItemSteak.cs" />
+    <Compile Include="Items\ItemCookedBeef.cs" />
     <Compile Include="Items\ItemStick.cs" />
     <Compile Include="Items\ItemStoneAxe.cs" />
     <Compile Include="Items\ItemStoneHoe.cs" />
@@ -477,7 +531,7 @@
     <Compile Include="Items\ItemWoodenPickaxe.cs" />
     <Compile Include="Items\ItemWoodenShovel.cs" />
     <Compile Include="Items\ItemWoodenSword.cs" />
-    <Compile Include="Items\ItemRawBeef.cs" />
+    <Compile Include="Items\ItemBeef.cs" />
     <Compile Include="Items\ItemRawChicken.cs" />
     <Compile Include="Items\ItemRawPorkchop.cs" />
     <Compile Include="LevelEventType.cs" />
@@ -487,6 +541,7 @@
     <Compile Include="MotdProvider.cs" />
     <Compile Include="Net\InternalPing.cs" />
     <Compile Include="Net\ItemSigner.cs" />
+    <Compile Include="Net\McpeBossEvent.cs" />
     <Compile Include="Net\McpeText.cs" />
     <Compile Include="Net\PlayerAction.cs" />
     <Compile Include="Net\SplitPartPackage.cs" />
@@ -544,7 +599,7 @@
     <Compile Include="PlayerInventory.cs" />
     <Compile Include="Items\Item.cs" />
     <Compile Include="Items\ItemBlock.cs" />
-    <Compile Include="Items\ItemDoor.cs" />
+    <Compile Include="Items\ItemWoodenDoor.cs" />
     <Compile Include="Items\ItemFactory.cs" />
     <Compile Include="Items\ItemFlintAndSteel.cs" />
     <Compile Include="Net\Ack.cs" />
@@ -570,10 +625,6 @@
     <Compile Include="Plugins\PluginContext.cs" />
     <Compile Include="Plugins\PluginManager.cs" />
     <Compile Include="Popup.cs" />
-    <Compile Include="Security\DefaultRoleStore.cs" />
-    <Compile Include="Security\DefaultUserStore.cs" />
-    <Compile Include="Security\Role.cs" />
-    <Compile Include="Security\User.cs" />
     <Compile Include="ServerInfo.cs" />
     <Compile Include="SessionManager.cs" />
     <Compile Include="Sounds\AnvilBreakSound.cs" />
@@ -593,10 +644,10 @@
     <Compile Include="Utils\BoundingBox.cs" />
     <Compile Include="Utils\ChunkCoordinates.cs" />
     <Compile Include="Utils\ConcurrentPriorityQueue.cs" />
+    <Compile Include="Utils\CooldownTimer.cs" />
     <Compile Include="Utils\CryptoContext.cs" />
     <Compile Include="Utils\CryptoUtils.cs" />
     <Compile Include="Utils\EnchantingExtensions.cs" />
-    <Compile Include="Utils\EntityLocations.cs" />
     <Compile Include="Utils\DedicatedThreadPool.cs" />
     <Compile Include="Utils\HighPrecisionTimer.cs" />
     <Compile Include="Utils\MapInfo.cs" />
@@ -615,7 +666,7 @@
     <Compile Include="Utils\VarInt.cs" />
     <Compile Include="Utils\WannabeRandom.cs" />
     <Compile Include="Utils\TextUtils.cs" />
-    <Compile Include="Utils\Vector3.cs" />
+    <Compile Include="Utils\VectorHelpers.cs" />
     <Compile Include="Utils\Compression.cs" />
     <Compile Include="Utils\BlockCoordinates.cs" />
     <Compile Include="Utils\Endian.cs" />
