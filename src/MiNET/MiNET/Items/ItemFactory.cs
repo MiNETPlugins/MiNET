@@ -1,3 +1,28 @@
+#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is MiNET.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
 using System;
 using System.Collections.Generic;
 using log4net;
@@ -32,21 +57,40 @@ namespace MiNET.Items
 		private static Dictionary<string, short> BuildNameToId()
 		{
 			var nameToId = new Dictionary<string, short>();
-			for (short idx = 256; idx < 500; idx++)
+			for (short idx = 0; idx < 500; idx++)
 			{
 				Item item = GetItem(idx);
 				string name = item.GetType().Name.ToLowerInvariant();
 
 				if (name.Equals("item"))
 				{
-					if (Log.IsDebugEnabled)
-						Log.Debug($"Missing implementation for item ID={idx}");
+					//if (Log.IsDebugEnabled)
+					//	Log.Debug($"Missing implementation for item ID={idx}");
 					continue;
+				}
+
+				if (name.Equals("itemblock"))
+				{
+					ItemBlock itemBlock = item as ItemBlock;
+					if (itemBlock != null)
+					{
+						Block block = itemBlock.Block;
+						name = block?.GetType().Name.ToLowerInvariant();
+						if (name == null || name.Equals("block"))
+						{
+							continue;
+						}
+					}
+				}
+				else
+				{
+					name = name.Substring(4);
 				}
 
 				try
 				{
-					nameToId.Add(name.Substring(4), idx);
+					nameToId.Remove(name); // This is in case a block was added that have item that should be used.
+					nameToId.Add(name, idx);
 				}
 				catch (Exception e)
 				{
@@ -89,15 +133,6 @@ namespace MiNET.Items
 			if (item != null) return item;
 
 			if (id == 0) item = new ItemAir();
-			else if (id == 54) item = new ItemChest();
-			else if (id == 44) item = new ItemSlab(id, metadata);
-			else if (id == 61) item = new ItemFurnace();
-			else if (id == 63) item = new ItemSign();
-			else if (id == 68) item = new ItemSign();
-			else if (id == 116) item = new ItemEnchantingTable();
-			else if (id == 158) item = new ItemSlab(id, metadata);
-			else if (id == 182) item = new ItemSlab(id, metadata);
-			else if (id == 199) item = new ItemItemFrame();
 			else if (id == 256) item = new ItemIronShovel();
 			else if (id == 257) item = new ItemIronPickaxe();
 			else if (id == 258) item = new ItemIronAxe();
@@ -106,6 +141,9 @@ namespace MiNET.Items
 			else if (id == 261) item = new ItemBow();
 			else if (id == 262) item = new ItemArrow();
 			else if (id == 263) item = new ItemCoal();
+			else if (id == 264) item = new ItemDiamond();
+			else if (id == 265) item = new ItemIronIngot();
+			else if (id == 266) item = new ItemGoldIngot();
 			else if (id == 267) item = new ItemIronSword();
 			else if (id == 268) item = new ItemWoodenSword();
 			else if (id == 269) item = new ItemWoodenShovel();
@@ -154,32 +192,42 @@ namespace MiNET.Items
 			else if (id == 317) item = new ItemGoldBoots();
 			else if (id == 319) item = new ItemRawPorkchop();
 			else if (id == 320) item = new ItemCookedPorkshop();
+			else if (id == 321) item = new ItemPainting();
 			else if (id == 322) item = new ItemGoldenApple();
 			else if (id == 323) item = new ItemSign();
 			else if (id == 324) item = new ItemWoodenDoor();
 			else if (id == 325) item = new ItemBucket(metadata);
+			else if (id == 329) item = new ItemSaddle();
 			else if (id == 331) item = new ItemRedstone();
 			else if (id == 332) item = new ItemSnowball();
+			else if (id == 333) item = new ItemBoat(metadata);
 			else if (id == 344) item = new ItemEgg();
 			else if (id == 345) item = new ItemCompass();
+			else if (id == 351) item = new ItemDye();
 			else if (id == 352) item = new ItemBone();
+			else if (id == 352) item = new ItemSugar();
 			else if (id == 355) item = new ItemBed();
 			else if (id == 357) item = new ItemCookie();
 			else if (id == 358) item = new ItemMap();
+			else if (id == 359) item = new ItemShears();
 			else if (id == 360) item = new ItemMelonSlice();
 			else if (id == 363) item = new ItemBeef();
 			else if (id == 364) item = new ItemCookedBeef();
 			else if (id == 365) item = new ItemRawChicken();
 			else if (id == 366) item = new ItemCookedChicken();
+			else if (id == 371) item = new ItemGoldNugget();
 			else if (id == 373) item = new ItemPotion(metadata);
 			else if (id == 380) item = new ItemCauldron();
-			else if (id == 383) item = new ItemSpawnEgg(metadata);
+			else if (id == 383) item = new ItemMonsterEgg(metadata);
+			else if (id == 389) item = new ItemFrame();
 			else if (id == 391) item = new ItemCarrot();
 			else if (id == 392) item = new ItemPotato();
 			else if (id == 393) item = new ItemBakedPotato();
 			else if (id == 395) item = new ItemEmptyMap();
+			else if (id == 395) item = new ItemGoldenCarrot();
 			else if (id == 397) item = new ItemMobHead(metadata);
 			else if (id == 400) item = new ItemPumpkinPie();
+			else if (id == 401) item = new ItemFireworks();
 			else if (id == 423) item = new ItemMuttonRaw();
 			else if (id == 424) item = new ItemMuttonCooked();
 			else if (id == 427) item = new ItemSpruceDoor();
@@ -188,6 +236,8 @@ namespace MiNET.Items
 			else if (id == 430) item = new ItemAcaciaDoor();
 			else if (id == 431) item = new ItemDarkOakDoor();
 			else if (id == 444) item = new ItemElytra();
+			else if (id == 446) item = new ItemBanner();
+			else if (id == 452) item = new ItemIronNugget();
 			else if (id == 458) item = new ItemBeetrootSeeds();
 			else if (id <= 255)
 			{

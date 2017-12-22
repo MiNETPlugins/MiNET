@@ -1,5 +1,28 @@
-using System.Collections.Generic;
-using System.Linq;
+#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is MiNET.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
 using System.Numerics;
 using AStarNavigator;
 using log4net;
@@ -8,7 +31,7 @@ using MiNET.Utils;
 
 namespace MiNET.Entities.Behaviors
 {
-	public class FollowOwnerBehavior : IBehavior
+	public class FollowOwnerBehavior : BehaviorBase
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof (TemptedBehavior));
 
@@ -23,7 +46,7 @@ namespace MiNET.Entities.Behaviors
 			_speedMultiplier = speedMultiplier;
 		}
 
-		public bool ShouldStart()
+		public override bool ShouldStart()
 		{
 			if (!_entity.IsTamed) return false;
 			if (_entity.Owner == null) return false;
@@ -31,49 +54,42 @@ namespace MiNET.Entities.Behaviors
 			return true;
 		}
 
-		public bool CanContinue()
+		public override bool CanContinue()
 		{
 			return ShouldStart();
 		}
 
-		private List<Tile> _currentPath = null;
+		private Path _currentPath;
 
-		public void OnTick()
+		public override void OnTick(Entity[] entities)
 		{
 			if (_entity.Owner == null) return;
-			Player player = (Player) _entity.Owner;
+			Player owner = (Player) _entity.Owner;
 
-			var distanceToPlayer = _entity.KnownPosition.DistanceTo(player.KnownPosition);
+			var distanceToPlayer = _entity.DistanceTo(owner);
 
 			if (distanceToPlayer < 1.75)
 			{
-				// if within 6m stop following (walking)
 				_entity.Velocity = Vector3.Zero;
-				_entity.Controller.LookAt(player);
+				_entity.Controller.LookAt(owner);
 				return;
 			}
 
-			if (_currentPath == null || _currentPath.Count == 0)
+			if (_currentPath == null || _currentPath.NoPath())
 			{
 				Log.Debug($"Search new solution");
-				var pathFinder = new PathFinder();
-				_currentPath = pathFinder.FindPath(_entity, player, distanceToPlayer + 1);
-				if (_currentPath.Count == 0)
-				{
-					_currentPath = pathFinder.FindPath(_entity, player, _lookDistance);
-				}
+				var pathFinder = new Pathfinder();
+				_currentPath = pathFinder.FindPath(_entity, owner, _lookDistance);
 			}
 
-			if (_currentPath.Count > 0)
+			if (_currentPath.HavePath())
 			{
-				Tile next;
-				if (!GetNextTile(out next)) return;
+				if (!_currentPath.GetNextTile(_entity, out Tile next)) return;
 
 				_entity.Controller.RotateTowards(new Vector3((float) next.X + 0.5f, _entity.KnownPosition.Y, (float) next.Y + 0.5f));
 
 				if (distanceToPlayer < 1.75)
 				{
-					// if within 6m stop following (walking)
 					_entity.Velocity = Vector3.Zero;
 					_currentPath = null;
 				}
@@ -91,7 +107,7 @@ namespace MiNET.Entities.Behaviors
 						m = m/2.0;
 					}
 					//double m = 1;
-					_entity.Controller.MoveForward(_speedMultiplier*m);
+					_entity.Controller.MoveForward(_speedMultiplier*m, entities);
 				}
 			}
 			else
@@ -101,13 +117,13 @@ namespace MiNET.Entities.Behaviors
 				_currentPath = null;
 			}
 
-			_entity.Controller.LookAt(player, true);
+			_entity.Controller.LookAt(owner);
 		}
 
 		private bool GetNextTile(out Tile next)
 		{
-			next = new Tile();
-			if (_currentPath.Count == 0) return false;
+			next = null;
+			if (_currentPath.NoPath()) return false;
 
 			next = _currentPath.First();
 
@@ -129,10 +145,11 @@ namespace MiNET.Entities.Behaviors
 			return (pos1 - pos2).Length();
 		}
 
-		public void OnEnd()
+		public override void OnEnd()
 		{
 			_entity.Velocity = Vector3.Zero;
 			_entity.KnownPosition.Pitch = 0;
+			_currentPath = null;
 		}
 	}
 }

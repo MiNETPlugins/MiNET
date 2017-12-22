@@ -13,7 +13,7 @@
 // WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
 // the specific language governing rights and limitations under the License.
 // 
-// The Original Code is Niclas Olofsson.
+// The Original Code is MiNET.
 // 
 // The Original Developer is the Initial Developer.  The Initial Developer of
 // the Original Code is Niclas Olofsson.
@@ -31,6 +31,7 @@ using System.IO.Compression;
 using System.Linq;
 using fNbt;
 using log4net;
+using MiNET.Blocks;
 using MiNET.Net;
 using MiNET.Utils;
 
@@ -41,6 +42,7 @@ namespace MiNET.Worlds
 		private static readonly ILog Log = LogManager.GetLogger(typeof (ChunkColumn));
 
 		public bool isAllAir = false;
+		public bool isNew = true;
 
 		public int x;
 		public int z;
@@ -122,7 +124,7 @@ namespace MiNET.Worlds
 		{
 			Chunk chunk = chunks[by >> 4];
 			chunk.SetBlocklight(bx, by - 16*(by >> 4), bz, data);
-			SetDirty();
+			//SetDirty();
 		}
 
 		public byte GetMetadata(int bx, int by, int bz)
@@ -148,7 +150,7 @@ namespace MiNET.Worlds
 		{
 			Chunk chunk = chunks[by >> 4];
 			chunk.SetSkylight(bx, by - 16*(by >> 4), bz, data);
-			SetDirty();
+			//SetDirty();
 		}
 
 		public NbtCompound GetBlockEntity(BlockCoordinates coordinates)
@@ -288,43 +290,79 @@ namespace MiNET.Worlds
 			{
 				for (int z = 0; z < 16; z++)
 				{
-					bool isInLight = true;
-					bool isInAir = true;
-
-					for (int y = 255; y >= 0; y--)
-					{
-						if (isInLight)
-						{
-							Chunk chunk = chunks[y >> 4];
-							if (isInAir && chunk.IsAllAir())
-							{
-								if (chunk.IsDirty) Fill<byte>(chunk.skylight.Data, 0xff);
-								y -= 15;
-								continue;
-							}
-
-							isInAir = false;
-
-							byte block = GetBlock(x, y, z);
-							if (block == 0 || block == 20 || block == 241)
-							{
-								SetSkyLight(x, y, z, 15);
-							}
-							else
-							{
-								SetHeight(x, z, (short)(y + 1));
-								SetSkyLight(x, y, z, 0);
-								isInLight = false;
-							}
-						}
-						else
-						{
-							SetSkyLight(x, y, z, 0);
-						}
-					}
+					RecalcHeight(x, z);
 				}
 			}
 		}
+
+		public void RecalcHeight(int x, int z, int startY = 255)
+		{
+			bool isInLight = true;
+			bool isInAir = true;
+
+			for (int y = startY; y >= 0; y--)
+			{
+				if (isInLight)
+				{
+					Chunk chunk = chunks[y >> 4];
+					if (isInAir && chunk.IsAllAir())
+					{
+						if (chunk.IsDirty) Fill<byte>(chunk.skylight.Data, 0xff);
+						y -= 15;
+						continue;
+					}
+
+					isInAir = false;
+
+					byte bid = GetBlock(x, y, z);
+					if (bid == 0 || (BlockFactory.TransparentBlocks[bid] == 1 && bid != 18 && bid != 30 && bid != 8 && bid != 9))
+					{
+						SetSkyLight(x, y, z, 15);
+					}
+					else
+					{
+						SetHeight(x, z, (short) (y + 1));
+						SetSkyLight(x, y, z, 0);
+						isInLight = false;
+					}
+				}
+				else
+				{
+					SetSkyLight(x, y, z, 0);
+				}
+			}
+		}
+
+		public int GetRecalatedHeight(int x, int z)
+		{
+			bool isInAir = true;
+
+			for (int y = 255; y >= 0; y--)
+			{
+				{
+					Chunk chunk = chunks[y >> 4];
+					if (isInAir && chunk.IsAllAir())
+					{
+						if (chunk.IsDirty) Fill<byte>(chunk.skylight.Data, 0xff);
+						y -= 15;
+						continue;
+					}
+
+					isInAir = false;
+
+					byte bid = GetBlock(x, y, z);
+					if (bid == 0 || (BlockFactory.TransparentBlocks[bid] == 1 && bid != 18 && bid != 30))
+					{
+						continue;
+					}
+
+					return y + 1;
+				}
+			}
+
+			return 0;
+		}
+
 
 		internal void ClearCache()
 		{

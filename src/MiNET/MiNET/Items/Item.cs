@@ -1,10 +1,37 @@
-﻿using System.Numerics;
+﻿#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is MiNET.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
+using System;
+using System.Numerics;
 using fNbt;
 using MiNET.BlockEntities;
 using MiNET.Blocks;
 using MiNET.Entities;
 using MiNET.Utils;
 using MiNET.Worlds;
+using Newtonsoft.Json;
 
 namespace MiNET.Items
 {
@@ -15,18 +42,29 @@ namespace MiNET.Items
 	///     frames, which turn into an entity when placed, and beds, which turn into a group of blocks when placed. When
 	///     equipped, items (and blocks) briefly display their names above the HUD.
 	/// </summary>
-	public class Item
+	public class Item: ICloneable
 	{
 		public short Id { get; protected set; }
 		public short Metadata { get; set; }
 		public byte Count { get; set; }
 		public virtual NbtCompound ExtraData { get; set; }
 
+		[JsonIgnore]
 		public ItemMaterial ItemMaterial { get; set; } = ItemMaterial.None;
+
+		[JsonIgnore]
 		public ItemType ItemType { get; set; } = ItemType.Item;
+
+		[JsonIgnore]
 		public int MaxStackSize { get; set; } = 64;
+
+		[JsonIgnore]
 		public bool IsStackable => MaxStackSize > 1;
+
+		[JsonIgnore]
 		public int Durability { get; set; }
+
+		[JsonIgnore]
 		public int FuelEfficiency { get; set; }
 
 		protected internal Item(short id, short metadata = 0, int count = 1)
@@ -40,7 +78,7 @@ namespace MiNET.Items
 		{
 		}
 
-		public virtual void UseItem(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
+		public virtual void PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
 		}
 
@@ -156,6 +194,11 @@ namespace MiNET.Items
 			{
 				return (Id*397) ^ Metadata.GetHashCode();
 			}
+		}
+
+		public object Clone()
+		{
+			return MemberwiseClone();
 		}
 
 		public override string ToString()

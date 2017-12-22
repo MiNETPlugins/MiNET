@@ -10,11 +10,21 @@ namespace MiNET.Test.Console
 	{
 		static void Main(string[] args)
 		{
-			MinetAnvilTest test = new MinetAnvilTest();
-			test.LoadFullAnvilRegionLoadTest();
+			//MinetAnvilTest test = new MinetAnvilTest();
+			//test.LoadFullAnvilRegionLoadTest();
 
+			MinetServerTest tests = new MinetServerTest();
+			tests.HighPrecTimerSignalingLoadTest();
+			System.Console.WriteLine("Running ...");
+
+			System.Console.WriteLine("<Enter> to ABORT");
 			System.Console.ReadLine();
+			tests.cancel.Cancel();
 
+			tests.PrintResults();
+
+			System.Console.WriteLine("<Enter> to exit");
+			System.Console.ReadLine();
 		}
 	}
 }

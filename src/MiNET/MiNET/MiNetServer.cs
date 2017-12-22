@@ -39,6 +39,7 @@ using Microsoft.IO;
 using MiNET.Net;
 using MiNET.Plugins;
 using MiNET.Utils;
+using MiNET.Worlds;
 using Newtonsoft.Json;
 
 namespace MiNET
@@ -177,7 +178,7 @@ namespace MiNET
 					PluginManager.EnablePlugins(this, LevelManager);
 
 					// Cache - remove
-					LevelManager.GetLevel(null, "overworld");
+					LevelManager.GetLevel(null, Dimension.Overworld.ToString());
 				}
 
 				GreylistManager = GreylistManager ?? new GreylistManager(this);
@@ -284,13 +285,12 @@ namespace MiNET
 				// this error indicates a previous send operation resulted in an ICMP Port Unreachable message.
 				// Note the spocket settings on creation of the server. It makes us ignore these resets.
 				IPEndPoint senderEndpoint = null;
-				Byte[] receiveBytes = null;
 				try
 				{
 					//var result = listener.ReceiveAsync().Result;
 					//senderEndpoint = result.RemoteEndPoint;
 					//receiveBytes = result.Buffer;
-					receiveBytes = listener.Receive(ref senderEndpoint);
+					Byte[] receiveBytes = listener.Receive(ref senderEndpoint);
 
 					Interlocked.Exchange(ref ServerInfo.AvailableBytes, listener.Available);
 					Interlocked.Increment(ref ServerInfo.NumberOfPacketsInPerSecond);
@@ -308,7 +308,7 @@ namespace MiNET
 							}
 							catch (Exception e)
 							{
-								Log.Warn(string.Format("Process message error from: {0}", senderEndpoint.Address), e);
+								Log.Warn($"Process message error from: {senderEndpoint.Address}", e);
 							}
 						});
 					}
@@ -497,7 +497,10 @@ namespace MiNET
 					}
 					default:
 						GreylistManager.Blacklist(senderEndpoint.Address);
-						Log.ErrorFormat("Receive unexpected packet with ID: {0} (0x{0:x2}) {2} from {1}", msgId, senderEndpoint.Address, (DefaultMessageIdTypes) msgId);
+						if (Log.IsInfoEnabled)
+						{
+							Log.ErrorFormat("Receive unexpected packet with ID: {0} (0x{0:x2}) {2} from {1}", msgId, senderEndpoint.Address, (DefaultMessageIdTypes) msgId);
+						}
 						break;
 				}
 			}
@@ -1021,7 +1024,9 @@ namespace MiNET
 			datagram.Header.datagramSequenceNumber = Interlocked.Increment(ref session.DatagramSequenceNumber);
 			datagram.TransmissionCount++;
 
-			byte[] data = datagram.Encode();
+			//byte[] data = datagram.Encode();
+			byte[] data;
+			var lenght = (int) datagram.GetEncoded(out data);
 
 			datagram.Timer.Restart();
 
@@ -1032,7 +1037,27 @@ namespace MiNET
 
 			lock (session.SyncRoot)
 			{
-				SendData(data, session.EndPoint);
+				SendData(data, lenght, session.EndPoint);
+			}
+		}
+
+		internal void SendData(byte[] data, int lenght, IPEndPoint targetEndPoint)
+		{
+			try
+			{
+				_listener.Send(data, lenght, targetEndPoint); // Less thread-issues it seems
+
+				Interlocked.Increment(ref ServerInfo.NumberOfPacketsOutPerSecond);
+				Interlocked.Add(ref ServerInfo.TotalPacketSizeOut, lenght);
+			}
+			catch (ObjectDisposedException e)
+			{
+				Log.Warn(e);
+			}
+			catch (Exception e)
+			{
+				Log.Warn(e);
+				//if (_listener == null || _listener.Client != null) Log.Error(string.Format("Send data lenght: {0}", data.Length), e);
 			}
 		}
 
@@ -1082,7 +1107,7 @@ namespace MiNET
 				{
 					Log.Debug($"> Receive: {message.Id} (0x{message.Id:x2}): {message.GetType().Name}");
 				}
-				else if (verbosity == 1)
+				else if (verbosity == 1 || verbosity == 3)
 				{
 					var jsonSerializerSettings = new JsonSerializerSettings
 					{
@@ -1096,7 +1121,7 @@ namespace MiNET
 					string result = JsonConvert.SerializeObject(message, jsonSerializerSettings);
 					Log.Debug($"> Receive: {message.Id} (0x{message.Id:x2}): {message.GetType().Name}\n{result}");
 				}
-				else if (verbosity == 2)
+				else if (verbosity == 2 || verbosity == 3)
 				{
 					Log.Debug($"> Receive: {message.Id} (0x{message.Id:x2}): {message.GetType().Name}\n{Package.HexDump(message.Bytes)}");
 				}
@@ -1113,10 +1138,12 @@ namespace MiNET
 			if (message is McpeWrapper) return;
 			if (message is UnconnectedPong) return;
 			if (message is McpeMovePlayer) return;
-			//if (message is McpeSetEntityMotion) return;
-			//if (message is McpeMoveEntity) return;
+			if (message is McpeSetEntityMotion) return;
+			if (message is McpeMoveEntity) return;
 			if (message is McpeSetEntityData) return;
 			if (message is McpeUpdateBlock) return;
+			if (message is McpeText) return;
+			if (message is McpeLevelEvent) return;
 			//if (!Debugger.IsAttached) return;
 
 			Log.DebugFormat("<    Send: {0}: {1} (0x{0:x2})", message.Id, message.GetType().Name);

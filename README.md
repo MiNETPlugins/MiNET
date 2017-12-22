@@ -3,18 +3,18 @@ In case you don't find the information your are looking for in the README. Do tr
 MiNET
 =====
 
-[![Join the chat at https://gitter.im/NiclasOlofsson/MiNET](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/NiclasOlofsson/MiNET?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) 
+[![Chat](https://img.shields.io/badge/chat-on%20discord-7289da.svg)](https://discord.gg/xCNrhDd) 
 [![Build status](https://ci.appveyor.com/api/projects/status/gb8ukrnogknic26e/branch/master?svg=true)](https://ci.appveyor.com/project/NiclasOlofsson/MiNET/branch/master) 
 [![NuGet Version and Downloads count](https://buildstats.info/nuget/MiNET)](https://www.nuget.org/packages/MiNET) 
 
 ## Can I test this before I download it?
 Yes, you can. Some of the below are professional networks, and at times there are dev servers running and you might be lucky enough to get in..<br>
 
-IP: **pe.mineplex.com**    
-Port: **19132**    
+IP: **CRISTALIX.PE**    
+Port: **19132**  
 
-IP: **trial.darkhammer.net (test/dev server)**    
-Port: **19132**
+IP: **play.infinite.pe**    
+Port: **19132**    
 
 IP: **pepirates.ru**    
 Port: **19132** 
@@ -57,8 +57,8 @@ Of course you can! We just need you to accept the following:
 2. You do not copy code from anyone or anywhere, unless you have their permissions.
 3. We can always decide not to include your code, and we might make changes to it. So better ask before you do a pull request to the project.
 
-Also, make sure to join our Gitter chat for easy communication.    
-[![Join the chat at https://gitter.im/NiclasOlofsson/MiNET](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/NiclasOlofsson/MiNET?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+Also, make sure to join our discord chat for easy communication.    
+[![Chat](https://img.shields.io/badge/chat-on%20discord-7289da.svg)](https://discord.gg/xCNrhDd) 
 
 ## Are there forums for MiNET?
 
@@ -75,5 +75,4 @@ For a windows installation you can choose to download the binary from the build 
 When downloading exe & dll files from the web they will often be sandboxed - You will need to right click and unblock within the properties window to allow these to be ran without errors.
 
 ### Mono (Linux & Mac)
-MCPE 0.15 introduced a lot of crypto, which is not implemented on Mono. So until another solution comes along, Mono support is not possible.
-~~[Mono Installation](https://github.com/NiclasOlofsson/MiNET/wiki/Running-MiNET-on-Linux)~~
+MCPE 0.15 introduced a lot of crypto, which is not implemented on Mono. So until another solution comes along, full support on Mono is not possible. However, there is a build configuration for Linux that disables the security and allow it to run on Mono. Please look at the wiki for [instructions on running MiNET on Mono](https://github.com/NiclasOlofsson/MiNET/wiki/Running-MiNET-on-Linux)

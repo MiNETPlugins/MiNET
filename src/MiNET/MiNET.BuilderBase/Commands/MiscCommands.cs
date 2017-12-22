@@ -26,20 +26,20 @@ namespace MiNET.BuilderBase.Commands
 		{
 			EditSession.Fill((BlockCoordinates) player.KnownPosition,
 				new Pattern(0, 0),
-				new Mask(player.Level, new List<Block> {new FlowingWater(), new StationaryWater(), new StationaryLava(), new FlowingLava()}, true),
+				new Mask(player.Level, new List<Block> {new FlowingWater(), new Water(), new Lava(), new FlowingLava()}, true),
 				radius,
 				-1, true);
 		}
 
-		[Command(Description = "Save world")]
-		public void Save(Player player)
-		{
-			AnvilWorldProvider provider = player.Level._worldProvider as AnvilWorldProvider;
-			if (provider != null)
-			{
-				provider.SaveChunks();
-			}
-		}
+		//[Command(Description = "Save world")]
+		//public void Save(Player player)
+		//{
+		//	AnvilWorldProvider provider = player.Level.WorldProvider as AnvilWorldProvider;
+		//	if (provider != null)
+		//	{
+		//		provider.SaveChunks();
+		//	}
+		//}
 
 		[Command(Description = "Render block-text of any font and size.")]
 		public void Text(Player player, string text, Pattern pattern, string fontName = "Minecraft", int pxSize = 20)

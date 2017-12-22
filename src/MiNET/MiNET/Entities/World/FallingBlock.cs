@@ -22,6 +22,7 @@ namespace MiNET.Entities.World
 			Height = Width = Length = 0.98;
 			Velocity = new Vector3(0, (float) -Gravity, 0);
 			NoAi = false;
+			HasCollision = true;
 
 			Gravity = 0.04;
 			Drag = 0.02;
@@ -53,7 +54,7 @@ namespace MiNET.Entities.World
 			return metadata;
 		}
 
-		public override void OnTick()
+		public override void OnTick(Entity[] entities)
 		{
 			PositionCheck();
 

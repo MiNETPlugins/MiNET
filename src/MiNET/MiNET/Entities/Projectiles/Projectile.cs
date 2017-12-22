@@ -21,6 +21,7 @@ namespace MiNET.Entities.Projectiles
 		public int Damage { get; set; }
 		public int PowerLevel { get; set; } = 0;
 		public float HitBoxPrecision { get; set; } = 0.3f;
+		public Vector3 Force { get; set; } = new Vector3();
 
 		protected Projectile(Player shooter, int entityTypeId, Level level, int damage, bool isCritical = false) : base(entityTypeId, level)
 		{
@@ -66,7 +67,7 @@ namespace MiNET.Entities.Projectiles
 			return metadata;
 		}
 
-		public override void OnTick()
+		public override void OnTick(Entity[] entities)
 		{
 			//base.OnTick();
 
@@ -163,6 +164,7 @@ namespace MiNET.Entities.Projectiles
 
 				Velocity *= (float) (1.0 - Drag);
 				Velocity -= new Vector3(0, (float) Gravity, 0);
+				Velocity += Force;
 
 				KnownPosition.Yaw = (float) Velocity.GetYaw();
 				KnownPosition.Pitch = (float) Velocity.GetPitch();
@@ -247,7 +249,7 @@ namespace MiNET.Entities.Projectiles
 						{
 							//if (!blockbox.Contains(KnownPosition.ToVector3())) continue;
 
-							if (block is FlowingLava || block is StationaryLava)
+							if (block is FlowingLava || block is Lava)
 							{
 								HealthManager.Ignite(1200);
 								continue;

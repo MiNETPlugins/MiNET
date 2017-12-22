@@ -32,14 +32,21 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Linux|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Linux\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;LINUX</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
   <ItemGroup>
-    <Reference Include="AStarNavigator, Version=1.0.63.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\AStarNavigator.1.0.63\lib\net35\AStarNavigator.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="AStarNavigator, Version=1.0.12.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MiNET.astar.1.0.12\lib\net461\AStarNavigator.dll</HintPath>
     </Reference>
-    <Reference Include="fNbt, Version=0.6.9.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\MiNET.fnbt.0.6.9\lib\net35-client\fNbt.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="fNbt, Version=1.0.13.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MiNET.fnbt.1.0.13\lib\net461\fNbt.dll</HintPath>
     </Reference>
     <Reference Include="jose-jwt, Version=2.3.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\jose-jwt.2.3.0\lib\net461\jose-jwt.dll</HintPath>
@@ -70,6 +77,9 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Numerics.Vectors" />
+    <Reference Include="System.ValueTuple, Version=4.0.1.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ValueTuple.4.3.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
+    </Reference>
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -79,20 +89,25 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AlwaysFullHungerManager.cs" />
+    <Compile Include="BlockEntities\BannerBlockEntity.cs" />
+    <Compile Include="BlockEntities\BeaconBlockEntity.cs" />
     <Compile Include="BlockEntities\BedBlockEntity.cs" />
     <Compile Include="BlockEntities\BlockEntity.cs" />
     <Compile Include="BlockEntities\BlockEntityFactory.cs" />
     <Compile Include="BlockEntities\ChestBlockEntity.cs" />
     <Compile Include="BlockEntities\EnchantingTableBlockEntity.cs" />
+    <Compile Include="BlockEntities\FlowerPotBlockEntity.cs" />
     <Compile Include="BlockEntities\FurnaceBlockEntity.cs" />
     <Compile Include="BlockEntities\ItemFrameBlockEntity.cs" />
+    <Compile Include="BlockEntities\MobSpawnerBlockEntity.cs" />
     <Compile Include="BlockEntities\Sign.cs" />
     <Compile Include="BlockEntities\SkullBlockEntity.cs" />
     <Compile Include="BlockFace.cs" />
     <Compile Include="Blocks\AcaciaDoor.cs" />
     <Compile Include="Blocks\AcaciaFenceGate.cs" />
-    <Compile Include="Blocks\AcaciaLeaves.cs" />
-    <Compile Include="Blocks\AcaciaLog.cs" />
+    <Compile Include="Blocks\Jukebox.cs" />
+    <Compile Include="Blocks\Leaves2.cs" />
+    <Compile Include="Blocks\Log2.cs" />
     <Compile Include="Blocks\AcaciaStairs.cs" />
     <Compile Include="Blocks\ActivatorRail.cs" />
     <Compile Include="Blocks\Anvil.cs" />
@@ -101,13 +116,13 @@
     <Compile Include="Blocks\Beetroot.cs" />
     <Compile Include="Blocks\BirchDoor.cs" />
     <Compile Include="Blocks\BirchFenceGate.cs" />
-    <Compile Include="Blocks\BirchWoodStairs.cs" />
+    <Compile Include="Blocks\BirchStairs.cs" />
     <Compile Include="Blocks\BlackGlazedTerracotta.cs" />
     <Compile Include="Blocks\BlockStairs.cs" />
     <Compile Include="Blocks\BlueGlazedTerracotta.cs" />
     <Compile Include="Blocks\BookShelf.cs" />
     <Compile Include="Blocks\BrewingStand.cs" />
-    <Compile Include="Blocks\Bricks.cs" />
+    <Compile Include="Blocks\BrickBlock.cs" />
     <Compile Include="Blocks\BrickStairs.cs" />
     <Compile Include="Blocks\BrownGlazedTerracotta.cs" />
     <Compile Include="Blocks\BrownMushroom.cs" />
@@ -122,17 +137,17 @@
     <Compile Include="Blocks\ChorusPlant.cs" />
     <Compile Include="Blocks\Clay.cs" />
     <Compile Include="Blocks\CobblestoneWall.cs" />
-    <Compile Include="Blocks\Cobweb.cs" />
+    <Compile Include="Blocks\Web.cs" />
     <Compile Include="Blocks\Cocoa.cs" />
     <Compile Include="Blocks\Concrete.cs" />
     <Compile Include="Blocks\ConcretePowder.cs" />
     <Compile Include="Blocks\Crops.cs" />
     <Compile Include="Blocks\CyanGlazedTerracotta.cs" />
     <Compile Include="Blocks\DarkOakDoor.cs" />
-    <Compile Include="Blocks\DoubleRedSandstoneSlab.cs" />
+    <Compile Include="Blocks\DoubleStoneSlab2.cs" />
     <Compile Include="Blocks\DragonEgg.cs" />
     <Compile Include="Blocks\Dropper.cs" />
-    <Compile Include="Blocks\EndBrick.cs" />
+    <Compile Include="Blocks\EndBricks.cs" />
     <Compile Include="Blocks\EnderChest.cs" />
     <Compile Include="Blocks\EndGateway.cs" />
     <Compile Include="Blocks\EndPortal.cs" />
@@ -156,11 +171,12 @@
     <Compile Include="Blocks\PoweredComparator.cs" />
     <Compile Include="Blocks\Prismarine.cs" />
     <Compile Include="Blocks\PurpleGlazedTerracotta.cs" />
-    <Compile Include="Blocks\PurPur.cs" />
+    <Compile Include="Blocks\PurpurBlock.cs" />
     <Compile Include="Blocks\PumpkinStem.cs" />
     <Compile Include="Blocks\PurPurStairs.cs" />
     <Compile Include="Blocks\RedGlazedTerracotta.cs" />
     <Compile Include="Blocks\RedSandstone.cs" />
+    <Compile Include="Blocks\SlabBase.cs" />
     <Compile Include="Blocks\StoneSlab2.cs" />
     <Compile Include="Blocks\RedSandstoneStairs.cs" />
     <Compile Include="Blocks\SeaLantern.cs" />
@@ -171,6 +187,7 @@
     <Compile Include="Blocks\StainedGlassPane.cs" />
     <Compile Include="Blocks\StickyPiston.cs" />
     <Compile Include="Blocks\UnpoweredComparator.cs" />
+    <Compile Include="Blocks\Water.cs" />
     <Compile Include="Blocks\Wheat.cs" />
     <Compile Include="Blocks\RedMushroom.cs" />
     <Compile Include="Blocks\WhiteGlazedTerracotta.cs" />
@@ -186,7 +203,7 @@
     <Compile Include="Blocks\EnchantingTable.cs" />
     <Compile Include="Blocks\EndPortalFrame.cs" />
     <Compile Include="Blocks\EndStone.cs" />
-    <Compile Include="Blocks\Flower.cs" />
+    <Compile Include="Blocks\RedFlower.cs" />
     <Compile Include="Blocks\FlowerPot.cs" />
     <Compile Include="Blocks\GlassPane.cs" />
     <Compile Include="Blocks\GlowingObsidian.cs" />
@@ -199,18 +216,18 @@
     <Compile Include="Blocks\IronBlock.cs" />
     <Compile Include="Blocks\IronDoor.cs" />
     <Compile Include="Blocks\IronTrapdoor.cs" />
-    <Compile Include="Blocks\ItemFrame.cs" />
+    <Compile Include="Blocks\Frame.cs" />
     <Compile Include="Blocks\LitPumpkin.cs" />
     <Compile Include="Blocks\JungleFenceGate.cs" />
     <Compile Include="Blocks\Ladder.cs" />
     <Compile Include="Blocks\Leaves.cs" />
     <Compile Include="Blocks\Lever.cs" />
     <Compile Include="Blocks\Waterlily.cs" />
-    <Compile Include="Blocks\Melon.cs" />
+    <Compile Include="Blocks\MelonBlock.cs" />
     <Compile Include="Blocks\Skull.cs" />
     <Compile Include="Blocks\MonsterEgg.cs" />
-    <Compile Include="Blocks\MonsterSpawner.cs" />
-    <Compile Include="Blocks\MossStone.cs" />
+    <Compile Include="Blocks\MobSpawner.cs" />
+    <Compile Include="Blocks\MossyCobblestone.cs" />
     <Compile Include="Blocks\Mycelium.cs" />
     <Compile Include="Blocks\NetherBrick.cs" />
     <Compile Include="Blocks\NetherBrickFence.cs" />
@@ -258,13 +275,13 @@
     <Compile Include="Blocks\CoalBlock.cs" />
     <Compile Include="Blocks\CoalOre.cs" />
     <Compile Include="Blocks\Cobblestone.cs" />
-    <Compile Include="Blocks\CobbleStoneStairs.cs" />
+    <Compile Include="Blocks\StoneStairs.cs" />
     <Compile Include="Blocks\CraftingTable.cs" />
     <Compile Include="Blocks\DarkOakStairs.cs" />
     <Compile Include="Blocks\DiamondOre.cs" />
     <Compile Include="Blocks\Dirt.cs" />
     <Compile Include="Blocks\DoubleStoneSlab.cs" />
-    <Compile Include="Blocks\DoubleWoodSlab.cs" />
+    <Compile Include="Blocks\DoubleWoodenSlab.cs" />
     <Compile Include="Blocks\Farmland.cs" />
     <Compile Include="Blocks\Fence.cs" />
     <Compile Include="Blocks\Fencegate.cs" />
@@ -280,7 +297,7 @@
     <Compile Include="Blocks\Gravel.cs" />
     <Compile Include="Blocks\Ice.cs" />
     <Compile Include="Blocks\IronOre.cs" />
-    <Compile Include="Blocks\JungleWoodStairs.cs" />
+    <Compile Include="Blocks\JungleStairs.cs" />
     <Compile Include="Blocks\LapisBlock.cs" />
     <Compile Include="Blocks\LapisOre.cs" />
     <Compile Include="Blocks\LitFurnace.cs" />
@@ -288,14 +305,14 @@
     <Compile Include="Blocks\Sandstone.cs" />
     <Compile Include="Blocks\Snow.cs" />
     <Compile Include="Blocks\Stationary.cs" />
-    <Compile Include="Blocks\StationaryLava.cs" />
+    <Compile Include="Blocks\Lava.cs" />
     <Compile Include="Blocks\NetherBrickStairs.cs" />
-    <Compile Include="Blocks\OakWoodStairs.cs" />
+    <Compile Include="Blocks\OakStairs.cs" />
     <Compile Include="Blocks\QuartzStairs.cs" />
     <Compile Include="Blocks\Sand.cs" />
     <Compile Include="Blocks\SandStoneStairs.cs" />
     <Compile Include="Blocks\Sapling.cs" />
-    <Compile Include="Blocks\SpruceWoodStairs.cs" />
+    <Compile Include="Blocks\SpruceStairs.cs" />
     <Compile Include="Blocks\StandingSign.cs" />
     <Compile Include="Blocks\Stone.cs" />
     <Compile Include="Blocks\StoneBrick.cs" />
@@ -305,18 +322,18 @@
     <Compile Include="Blocks\GrassPath.cs" />
     <Compile Include="Blocks\Torch.cs" />
     <Compile Include="Blocks\WallSign.cs" />
-    <Compile Include="Blocks\StationaryWater.cs" />
     <Compile Include="Blocks\Log.cs" />
     <Compile Include="Blocks\Planks.cs" />
     <Compile Include="Blocks\WoodenPressurePlate.cs" />
-    <Compile Include="Blocks\WoodSlab.cs" />
+    <Compile Include="Blocks\WoodenSlab.cs" />
     <Compile Include="Blocks\Tnt.cs" />
     <Compile Include="Blocks\Wool.cs" />
     <Compile Include="Blocks\YellowGlazedTerracotta.cs" />
     <Compile Include="CertificateChain.cs" />
     <Compile Include="CertificateData.cs" />
     <Compile Include="ConnectionState.cs" />
-    <Compile Include="Crafting\Recipe.cs" />
+    <Compile Include="Crafting\RecipeManager.cs" />
+    <Compile Include="Crafting\Recipes.cs" />
     <Compile Include="DamageCalculator.cs" />
     <Compile Include="Effects\Absorption.cs" />
     <Compile Include="Effects\Blindness.cs" />
@@ -343,6 +360,7 @@
     <Compile Include="Effects\Weakness.cs" />
     <Compile Include="Effects\Wither.cs" />
     <Compile Include="Entities\Agent.cs" />
+    <Compile Include="Entities\Behaviors\CreeperSwellBehavior.cs" />
     <Compile Include="Entities\Behaviors\EatBlockBehavior.cs" />
     <Compile Include="Entities\Behaviors\FindAttackableTargetBehavior.cs" />
     <Compile Include="Entities\Behaviors\FollowOwnerBehavior.cs" />
@@ -351,7 +369,7 @@
     <Compile Include="Entities\Behaviors\IBehavior.cs" />
     <Compile Include="Entities\Behaviors\JumpAttackBehavior.cs" />
     <Compile Include="Entities\Behaviors\LookAtPlayerBehavior.cs" />
-    <Compile Include="Entities\Behaviors\MeeleAttackBehavior.cs" />
+    <Compile Include="Entities\Behaviors\MeleeAttackBehavior.cs" />
     <Compile Include="Entities\Behaviors\MobController.cs" />
     <Compile Include="Entities\Behaviors\OwnerHurtByTargetBehavior.cs" />
     <Compile Include="Entities\Behaviors\OwnerHurtTargetBehavior.cs" />
@@ -361,6 +379,7 @@
     <Compile Include="Entities\Behaviors\SittingBehavior.cs" />
     <Compile Include="Entities\Behaviors\StrollBehavior.cs" />
     <Compile Include="Entities\Behaviors\TemptedBehavior.cs" />
+    <Compile Include="Entities\Behaviors\WanderBehavior.cs" />
     <Compile Include="Entities\BossBar.cs" />
     <Compile Include="Entities\EntitySpawnManager.cs" />
     <Compile Include="Entities\Hologram.cs" />
@@ -377,6 +396,7 @@
     <Compile Include="Entities\Hostile\Wither.cs" />
     <Compile Include="Entities\Hostile\WitherSkeleton.cs" />
     <Compile Include="Entities\Npc.cs" />
+    <Compile Include="Entities\Painting.cs" />
     <Compile Include="Entities\Passive\Horse.cs" />
     <Compile Include="Entities\Passive\Llama.cs" />
     <Compile Include="Entities\Passive\PolarBear.cs" />
@@ -406,6 +426,7 @@
     <Compile Include="Entities\ImageProviders\RandomColorMapImageProvider.cs" />
     <Compile Include="Entities\ImageProviders\TextMapImageProvider.cs" />
     <Compile Include="Entities\ImageProviders\VideoImageProvider.cs" />
+    <Compile Include="Entities\Projectiles\FireworksRocket.cs" />
     <Compile Include="Entities\Vehicles\Boat.cs" />
     <Compile Include="Entities\Vehicles\Vehicle.cs" />
     <Compile Include="Entities\World\FallingBlock.cs" />
@@ -433,6 +454,33 @@
     <Compile Include="Entities\Projectiles\Snowball.cs" />
     <Compile Include="Entities\Projectiles\Projectile.cs" />
     <Compile Include="Entities\Vehicles\Minecart.cs" />
+    <Compile Include="Items\ItemBanner.cs" />
+    <Compile Include="Items\ItemBoat.cs" />
+    <Compile Include="Items\ItemFireworks.cs" />
+    <Compile Include="Items\ItemGoldenCarrot.cs" />
+    <Compile Include="Items\ItemGoldIngot.cs" />
+    <Compile Include="Items\ItemGoldNugget.cs" />
+    <Compile Include="Items\ItemIronIngot.cs" />
+    <Compile Include="Items\ItemIronNugget.cs" />
+    <Compile Include="Blocks\StandingBanner.cs" />
+    <Compile Include="Blocks\WallBanner.cs" />
+    <Compile Include="Items\ItemPainting.cs" />
+    <Compile Include="Items\ItemSaddle.cs" />
+    <Compile Include="Items\ItemShears.cs" />
+    <Compile Include="Items\ItemSugar.cs" />
+    <Compile Include="Net\McpeMovePlayer.cs" />
+    <Compile Include="Utils\Diagnostics\Profiler.cs" />
+    <Compile Include="Utils\Skins\Bone.cs" />
+    <Compile Include="Utils\Skins\Cube.cs" />
+    <Compile Include="Utils\Skins\Geometry.cs" />
+    <Compile Include="Utils\Skins\GeometryModel.cs" />
+    <Compile Include="Net\McpeInteract.cs" />
+    <Compile Include="UI\Button.cs" />
+    <Compile Include="UI\CustomElement.cs" />
+    <Compile Include="UI\CustomForm.cs" />
+    <Compile Include="UI\Dropdown.cs" />
+    <Compile Include="UI\Element.cs" />
+    <Compile Include="UI\Form.cs" />
     <Compile Include="GreyListManager.cs" />
     <Compile Include="HungerManager.cs" />
     <Compile Include="Inventory.cs" />
@@ -452,7 +500,6 @@
     <Compile Include="Items\ItemBread.cs" />
     <Compile Include="Items\ItemCarrot.cs" />
     <Compile Include="Items\ItemCauldron.cs" />
-    <Compile Include="Items\ItemChest.cs" />
     <Compile Include="Items\ItemCoal.cs" />
     <Compile Include="Items\ItemCommand.cs" />
     <Compile Include="Items\ItemCompass.cs" />
@@ -469,11 +516,10 @@
     <Compile Include="Items\ItemDiamondShovel.cs" />
     <Compile Include="Items\ItemDiamondLeggings.cs" />
     <Compile Include="Items\ItemDiamondSword.cs" />
+    <Compile Include="Items\ItemDye.cs" />
     <Compile Include="Items\ItemEgg.cs" />
     <Compile Include="Items\ItemElytra.cs" />
     <Compile Include="Items\ItemEmptyMap.cs" />
-    <Compile Include="Items\ItemEnchantingTable.cs" />
-    <Compile Include="Items\ItemFurnace.cs" />
     <Compile Include="Items\ItemGoldAxe.cs" />
     <Compile Include="Items\ItemGoldenApple.cs" />
     <Compile Include="Items\ItemGoldHoe.cs" />
@@ -487,7 +533,7 @@
     <Compile Include="Items\ItemHoe.cs" />
     <Compile Include="Items\ItemIronAxe.cs" />
     <Compile Include="Items\ItemIronPickaxe.cs" />
-    <Compile Include="Items\ItemItemFrame.cs" />
+    <Compile Include="Items\ItemFrame.cs" />
     <Compile Include="Items\ItemLeatherBoots.cs" />
     <Compile Include="Items\ItemLeatherChestplate.cs" />
     <Compile Include="Items\ItemLeatherHelmet.cs" />
@@ -514,9 +560,8 @@
     <Compile Include="Items\ItemRedstone.cs" />
     <Compile Include="Items\ItemSign.cs" />
     <Compile Include="Items\ItemShovel.cs" />
-    <Compile Include="Items\ItemSlab.cs" />
     <Compile Include="Items\ItemSnowball.cs" />
-    <Compile Include="Items\ItemSpawnEgg.cs" />
+    <Compile Include="Items\ItemMonsterEgg.cs" />
     <Compile Include="Items\ItemCookedBeef.cs" />
     <Compile Include="Items\ItemStick.cs" />
     <Compile Include="Items\ItemStoneAxe.cs" />
@@ -540,14 +585,14 @@
     <Compile Include="MessageType.cs" />
     <Compile Include="MotdProvider.cs" />
     <Compile Include="Net\InternalPing.cs" />
-    <Compile Include="Net\ItemSigner.cs" />
+    <Compile Include="Net\McpeAvailableCommands.cs" />
     <Compile Include="Net\McpeBossEvent.cs" />
     <Compile Include="Net\McpeText.cs" />
     <Compile Include="Net\PlayerAction.cs" />
     <Compile Include="Net\SplitPartPackage.cs" />
     <Compile Include="Net\UUID.cs" />
     <Compile Include="Net\WiredAttribute.cs" />
-    <Compile Include="Net\Skin.cs" />
+    <Compile Include="Utils\Skins\Skin.cs" />
     <Compile Include="Particles\BubbleParticle.cs" />
     <Compile Include="Particles\CriticalParticle.cs" />
     <Compile Include="Particles\DestroyBlockParticle.cs" />
@@ -640,6 +685,13 @@
     <Compile Include="Sounds\ShootSound.cs" />
     <Compile Include="Sounds\Sound.cs" />
     <Compile Include="Sounds\ClickSound.cs" />
+    <Compile Include="UI\Input.cs" />
+    <Compile Include="UI\Label.cs" />
+    <Compile Include="UI\ModalForm.cs" />
+    <Compile Include="UI\SimpleForm.cs" />
+    <Compile Include="UI\Slider.cs" />
+    <Compile Include="UI\StepSlider.cs" />
+    <Compile Include="UI\Toggle.cs" />
     <Compile Include="Utils\BatchUtils.cs" />
     <Compile Include="Utils\BoundingBox.cs" />
     <Compile Include="Utils\ChunkCoordinates.cs" />
@@ -663,6 +715,7 @@
     <Compile Include="Utils\ResourcePacks.cs" />
     <Compile Include="Utils\RuleData.cs" />
     <Compile Include="Utils\StreamExtensions.cs" />
+    <Compile Include="Utils\Transaction.cs" />
     <Compile Include="Utils\VarInt.cs" />
     <Compile Include="Utils\WannabeRandom.cs" />
     <Compile Include="Utils\TextUtils.cs" />
@@ -687,6 +740,7 @@
     <Compile Include="Utils\NibbleArray.cs" />
     <Compile Include="Utils\PlayerLocation.cs" />
     <Compile Include="Utils\Records.cs" />
+    <Compile Include="Worlds\AirWorldGenerator.cs" />
     <Compile Include="Worlds\AnvilWorldProvider.cs" />
     <Compile Include="Worlds\BiomeUtils.cs" />
     <Compile Include="Worlds\Chunk.cs" />
@@ -695,14 +749,17 @@
     <Compile Include="Worlds\CoolWorldProvider.cs" />
     <Compile Include="Worlds\CraftNetAnvilWorldProvider.cs" />
     <Compile Include="Worlds\Difficulty.cs" />
+    <Compile Include="Worlds\Dimension.cs" />
     <Compile Include="Worlds\EntityManager.cs" />
     <Compile Include="Worlds\ExperimentalWorldProvider.cs" />
     <Compile Include="Worlds\FlatlandWorldProvider.cs" />
     <Compile Include="Worlds\GameMode.cs" />
+    <Compile Include="Worlds\IBlockAccess.cs" />
     <Compile Include="Worlds\ICachingWorldProvider.cs" />
     <Compile Include="Worlds\IWorldProvider.cs" />
     <Compile Include="Worlds\Level.cs" />
     <Compile Include="Worlds\LevelInfo.cs" />
+    <Compile Include="Worlds\SuperflatGenerator.cs" />
     <Compile Include="Worlds\SkyLightCalculations.cs" />
     <Compile Include="Worlds\Structures\AcaciaTree.cs" />
     <Compile Include="Worlds\Structures\BirchTree.cs" />
@@ -710,6 +767,11 @@
     <Compile Include="Worlds\Structures\OakTree.cs" />
     <Compile Include="Worlds\Structures\SpruceTree.cs" />
     <Compile Include="Worlds\Structures\StructureClass.cs" />
+    <None Include="Net\MCPE Protocol Documentation.md">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>MCPE Protocol Documentation.tt</DependentUpon>
+    </None>
     <None Include="Net\MCPE Protocol.xml">
       <SubType>Designer</SubType>
     </None>
@@ -719,11 +781,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="MiNET.nuspec" />
-    <None Include="Net\MCPE Protocol Documentation.md">
-      <DependentUpon>MCPE Protocol Documentation.tt</DependentUpon>
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-    </None>
     <None Include="Net\MCPE Protocol Documentation.tt">
       <DependentUpon>MCPE Protocol.xml</DependentUpon>
       <Generator>TextTemplatingFileGenerator</Generator>
@@ -741,7 +798,9 @@
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Content Include="Entities\entity_metadata.txt" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

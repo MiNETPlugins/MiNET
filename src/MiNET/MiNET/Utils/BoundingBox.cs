@@ -29,6 +29,19 @@ namespace MiNET.Utils
 			Max = box.Max;
 		}
 
+		public BoundingBox GetAdjustedBoundingBox()
+		{
+			float xMin = Math.Min(Min.X, Max.X);
+			float yMin = Math.Min(Min.Y, Max.Y);
+			float zMin = Math.Min(Min.Z, Max.Z);
+
+			float xMax = Math.Max(Min.X, Max.X);
+			float yMax = Math.Max(Min.Y, Max.Y);
+			float zMax = Math.Max(Min.Z, Max.Z);
+
+			return new BoundingBox(new Vector3(xMin, yMin, zMin), new Vector3(xMax, yMax, zMax));
+		}
+
 		public ContainmentType Contains(BoundingBox box)
 		{
 			//test if all corner is in the same side of a face by just checking min and max
@@ -140,12 +153,18 @@ namespace MiNET.Utils
 
 		public static BoundingBox operator +(BoundingBox a, float b)
 		{
-			return new BoundingBox(a.Min - new Vector3(b), a.Max + new Vector3(b));
+			//Vector3.Min(a.Min - new Vector3(b), a.Min + new Vector3(b))
+			//Vector3.Max(a.Max - new Vector3(b), a.Max + new Vector3(b))
+			return new BoundingBox(
+				Vector3.Min(a.Min - new Vector3(b), a.Min + new Vector3(b)),
+				Vector3.Max(a.Max - new Vector3(b), a.Max + new Vector3(b)));
 		}
 
 		public static BoundingBox operator -(BoundingBox a, float b)
 		{
-			return new BoundingBox(a.Min + new Vector3(b), a.Max - new Vector3(b));
+			return new BoundingBox(
+				Vector3.Max(a.Min - new Vector3(b), a.Min + new Vector3(b)),
+				Vector3.Min(a.Max - new Vector3(b), a.Max + new Vector3(b)));
 		}
 
 		public static bool operator ==(BoundingBox a, BoundingBox b)
@@ -163,19 +182,8 @@ namespace MiNET.Utils
 			return string.Format("{{Min:{0} Max:{1}}}", Min.ToString(), Max.ToString());
 		}
 
-		public double Height
-		{
-			get { return Max.Y - Min.Y; }
-		}
-
-		public double Width
-		{
-			get { return Max.X - Min.X; }
-		}
-
-		public double Depth
-		{
-			get { return Max.Z - Min.Z; }
-		}
+		public double Height => Math.Abs(Max.Y - Min.Y);
+		public double Width => Math.Abs(Max.X - Min.X);
+		public double Depth => Math.Abs(Max.Z - Min.Z);
 	}
 }

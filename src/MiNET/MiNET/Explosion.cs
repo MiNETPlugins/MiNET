@@ -70,18 +70,19 @@ namespace MiNET
 							double x = i/(Ray - 1.0F)*2.0F - 1.0F;
 							double y = j/(Ray - 1.0F)*2.0F - 1.0F;
 							double z = k/(Ray - 1.0F)*2.0F - 1.0F;
-							double d6 = Math.Sqrt(x*x + y*y + z*z);
+							double dist = Math.Sqrt(x*x + y*y + z*z);
 
-							x /= d6;
-							y /= d6;
-							z /= d6;
-							var blastForce1 = (float) (_size*(0.7F + new Random().NextDouble()*0.6F));
+							x /= dist;
+							y /= dist;
+							z /= dist;
+							float blastForce1 = (float) (_size*(0.7F + _world.Random.NextDouble()*0.6F));
 
 							double cX = _centerCoordinates.X;
 							double cY = _centerCoordinates.Y;
 							double cZ = _centerCoordinates.Z;
 
-							for (float blastForce2 = 0.3F; blastForce1 > 0.0F; blastForce1 -= blastForce2*0.75F)
+							//for (float blastForce2 = 0.3F; blastForce1 > 0.0F; blastForce1 -= blastForce2*0.75F)
+							for (float blastForce2 = 0.3F; blastForce1 > 0.0F; blastForce1 -= 0.225f)
 							{
 								var bx = (int) Math.Floor(cX);
 								var by = (int) Math.Floor(cY);
@@ -90,8 +91,8 @@ namespace MiNET
 
 								if (!(block is Air))
 								{
-									float blastForce3 = block.GetHardness();
-									blastForce1 -= (blastForce3 + 0.3F)*blastForce2;
+									float blastForce3 = block.BlastResistance/5f;
+									blastForce1 -= (blastForce3 + 0.3F)*0.3f;
 								}
 
 								if (blastForce1 > 0.0F)
@@ -143,7 +144,7 @@ namespace MiNET
 			foreach (Block block in _afectedBlocks.Values)
 			{
 				Block block1 = block;
-				_world.SetBlock(new Air {Coordinates = block1.Coordinates});
+				_world.SetAir(block1.Coordinates);
 				//new Task(() => _world.SetBlock(new Air {Coordinates = block1.Coordinates})).Start();
 				//new Task(() => block1.BreakBlock(_world)).Start();
 				if (block is Tnt)
@@ -180,9 +181,9 @@ namespace MiNET
 			{
 				KnownPosition = new PlayerLocation
 				{
-					X = blockCoordinates.X,
-					Y = blockCoordinates.Y,
-					Z = blockCoordinates.Z,
+					X = blockCoordinates.X + 0.5f,
+					Y = blockCoordinates.Y + 0.5f,
+					Z = blockCoordinates.Z + 0.5f,
 				},
 				Fuse = (byte) (rand.Next(0, 20) + 10)
 			}.SpawnEntity();

@@ -13,7 +13,7 @@
 // WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
 // the specific language governing rights and limitations under the License.
 // 
-// The Original Code is Niclas Olofsson.
+// The Original Code is MiNET.
 // 
 // The Original Developer is the Initial Developer.  The Initial Developer of
 // the Original Code is Niclas Olofsson.
@@ -28,9 +28,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
+using log4net;
 using MiNET.Entities;
 using MiNET.Entities.Hostile;
 using MiNET.Entities.Passive;
+using MiNET.Entities.Vehicles;
 using MiNET.Items;
 using MiNET.Net;
 using MiNET.Plugins.Attributes;
@@ -41,55 +43,52 @@ namespace MiNET.Plugins.Commands
 {
 	public class VanillaCommands
 	{
-		private readonly PluginManager _pluginManager;
+		private static readonly ILog Log = LogManager.GetLogger(typeof (VanillaCommands));
 
-		public VanillaCommands(PluginManager pluginManager)
+		public VanillaCommands()
 		{
-			_pluginManager = pluginManager;
 		}
 
-		public class SimpleResponse
+		[Command(Name = "op", Description = "Make player an operator")]
+		[Authorize(Permission = 4)]
+		public string MakeOperator(Player commander, Target target)
 		{
-			public string Body { get; set; }
-			public int StatusCode { get; set; }
-			public int SuccessCount { get; set; } = 1;
-		}
+			string body = target.Selector;
 
-		[Command(Name = "op")]
-		public SimpleResponse MakeOperator(Player commander, Target player)
-		{
-			string body = player.Selector;
-
-			if (player.Players != null)
+			if (target.Players != null)
 			{
 				List<string> names = new List<string>();
-				foreach (var p in player.Players)
+				foreach (var p in target.Players)
 				{
 					names.Add(p.Username);
+					p.ActionPermissions = ActionPermissions.Operator;
+					p.CommandPermission = 4;
+					p.PermissionLevel = PermissionLevel.Operator;
+					p.SendAdventureSettings();
 				}
 				body = string.Join(", ", names);
 			}
-			else if (player.Entities != null)
+			else if (target.Entities != null)
 			{
 				List<string> names = new List<string>();
-				foreach (var p in player.Entities)
+				foreach (var p in target.Entities)
 				{
 					names.Add(p.NameTag ?? p.EntityId + "");
 				}
 				body = string.Join(", ", names);
 			}
 
-			return new SimpleResponse {Body = $"Oped: {body}"};
+			return $"Oped: {body}";
 		}
 
 		[Command]
-		public SimpleResponse SetBlock(Player commander, BlockPos position, BlockTypeEnum tileName, int tileData = 0)
+		public string SetBlock(Player commander, BlockPos position, BlockTypeEnum tileName, int tileData = 0)
 		{
-			return new SimpleResponse {Body = $"Set block complete. {position.XRelative} {tileName.Value}"};
+			return $"Set block complete. {position.XRelative} {tileName.Value}";
 		}
 
 		[Command]
-		public SimpleResponse Give(Player commander, Target player, ItemTypeEnum itemName, int amount = 1, int data = 0)
+		public string Give(Player commander, Target player, ItemTypeEnum itemName, int amount = 1, int data = 0)
 		{
 			string body = player.Selector;
 
@@ -102,13 +101,15 @@ namespace MiNET.Plugins.Commands
 
 					Item item = ItemFactory.GetItem(ItemFactory.GetItemIdByName(itemName.Value), (short) data, (byte) amount);
 
-					var inventory = p.Inventory.SetFirstEmptySlot(item, true, false);
+					if (item.Count > item.MaxStackSize) return $"The number you have entered ({amount}) is too big. It must be at most {item.MaxStackSize}";
+
+					p.Inventory.SetFirstEmptySlot(item, true);
 				}
 				body = string.Join(", ", names);
 			}
 
 
-			return new SimpleResponse {Body = $"Gave {body} {amount} of {itemName.Value}."};
+			return $"Gave {body} {amount} of {itemName.Value}.";
 		}
 
 		[Command]
@@ -152,6 +153,7 @@ namespace MiNET.Plugins.Commands
 			var world = player.Level;
 
 			Mob mob = null;
+			Entity entity = null;
 
 			EntityType type = (EntityType) (int) petType;
 			switch (type)
@@ -253,7 +255,8 @@ namespace MiNET.Plugins.Commands
 					mob = new ElderGuardian(world);
 					break;
 				case EntityType.Horse:
-					mob = new Horse(world);
+				    var random = new Random();
+				    mob = new Horse(world, random.NextDouble() < 0.10, random);
 					break;
 				case EntityType.PolarBear:
 					mob = new PolarBear(world);
@@ -282,17 +285,30 @@ namespace MiNET.Plugins.Commands
 				case EntityType.Npc:
 					mob = new PlayerMob("test", world);
 					break;
+
+				case EntityType.Boat:
+					entity = new Boat(world);
+					break;
 			}
 
-			if (mob == null) return;
-			mob.NoAi = noAi;
-			var direction = Vector3.Normalize(player.KnownPosition.GetHeadDirection())*1.5f;
-			mob.KnownPosition = new PlayerLocation(coordinates.X + direction.X, coordinates.Y, coordinates.Z + direction.Z, coordinates.HeadYaw, coordinates.Yaw);
-			mob.SpawnEntity();
+			if (mob != null)
+			{
+				mob.NoAi = noAi;
+				var direction = Vector3.Normalize(player.KnownPosition.GetHeadDirection())*1.5f;
+				mob.KnownPosition = new PlayerLocation(coordinates.X + direction.X, coordinates.Y, coordinates.Z + direction.Z, coordinates.HeadYaw, coordinates.Yaw);
+				mob.SpawnEntity();
+			}
+			else if (entity != null)
+			{
+				entity.NoAi = noAi;
+				var direction = Vector3.Normalize(player.KnownPosition.GetHeadDirection()) * 1.5f;
+				entity.KnownPosition = new PlayerLocation(coordinates.X + direction.X, coordinates.Y, coordinates.Z + direction.Z, coordinates.HeadYaw, coordinates.Yaw);
+				entity.SpawnEntity();
+			}
 		}
 
 		[Command]
-		public SimpleResponse Xp(Player commander, int experience, Target player)
+		public string Xp(Player commander, int experience, Target player)
 		{
 			string body = player.Selector;
 
@@ -309,11 +325,11 @@ namespace MiNET.Plugins.Commands
 				body = string.Join(", ", names);
 			}
 
-			return new SimpleResponse {Body = $"Gave {body} {experience} experience points."};
+			return $"Gave {body} {experience} experience points.";
 		}
 
 		[Command]
-		public SimpleResponse Difficulty(Player commander, Difficulty difficulty)
+		public string Difficulty(Player commander, Difficulty difficulty)
 		{
 			Level level = commander.Level;
 			level.Difficulty = difficulty;
@@ -322,22 +338,20 @@ namespace MiNET.Plugins.Commands
 				player.SendSetDificulty();
 			}
 
-			return new SimpleResponse {Body = $"{commander.Username} set difficulty to {difficulty}"};
+			return $"{commander.Username} set difficulty to {difficulty}";
 		}
 
-		[Command(Name = "time set")]
-		public SimpleResponse TimeSet(Player commander, int time)
+		[Command(Name = "time set", Description = "Changes or queries the world's game time")]
+		public string TimeSet(Player commander, int time = 5000)
 		{
 			Level level = commander.Level;
-			level.CurrentWorldTime = time;
+			level.WorldTime = time;
 
 			McpeSetTime message = McpeSetTime.CreateObject();
-			message.time = (int) level.CurrentWorldTime;
-			//message.started = level.IsWorldTimeStarted;
-
+			message.time = (int) level.WorldTime;
 			level.RelayBroadcast(message);
 
-			return new SimpleResponse {Body = $"{commander.Username} sets time to {time}"};
+			return $"{commander.Username} sets time to {time}";
 		}
 
 		public enum DayNight
@@ -347,22 +361,20 @@ namespace MiNET.Plugins.Commands
 		}
 
 		[Command(Name = "time set")]
-		public SimpleResponse TimeSet(Player commander, DayNight time)
+		public string TimeSet(Player commander, DayNight time)
 		{
 			Level level = commander.Level;
-			level.CurrentWorldTime = (int) time;
+			level.WorldTime = (int) time;
 
 			McpeSetTime message = McpeSetTime.CreateObject();
-			message.time = (int) level.CurrentWorldTime;
-			//message.started = level.IsWorldTimeStarted;
-
+			message.time = (int) level.WorldTime;
 			level.RelayBroadcast(message);
 
-			return new SimpleResponse {Body = $"{commander.Username} sets time to {time}"};
+			return $"{commander.Username} sets time to {time}";
 		}
 
 		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports self to given position.")]
-		public SimpleResponse Teleport(Player commander, BlockPos destination, int yrot = 90, int xrot = 0)
+		public string Teleport(Player commander, BlockPos destination, int yrot = 90, int xrot = 0)
 		{
 			var coordinates = commander.KnownPosition;
 			if (destination != null)
@@ -396,11 +408,11 @@ namespace MiNET.Plugins.Commands
 				});
 			}, null);
 
-			return new SimpleResponse {Body = $"{commander.Username} teleported to coordinates {coordinates.X},{coordinates.Y},{coordinates.Z}."};
+			return $"{commander.Username} teleported to coordinates {coordinates.X},{coordinates.Y},{coordinates.Z}.";
 		}
 
 		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports player to given coordinates.")]
-		public SimpleResponse Teleport(Player commander, Target victim, BlockPos destination, int yrot = 90, int xrot = 0)
+		public string Teleport(Player commander, Target victim, BlockPos destination, int yrot = 90, int xrot = 0)
 		{
 			string body = victim.Selector;
 
@@ -446,16 +458,16 @@ namespace MiNET.Plugins.Commands
 				body = string.Join(", ", names);
 			}
 
-			return new SimpleResponse {Body = $"{body} teleported to new coordinates."};
+			return $"{body} teleported to new coordinates.";
 		}
 
 
 		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports player to other player.")]
-		public SimpleResponse Teleport(Player commander, Target victim, Target target)
+		public string Teleport(Player commander, Target victim, Target target)
 		{
 			string body = victim.Selector;
 
-			if (target.Players == null || target.Players.Length != 1) return new SimpleResponse {Body = "Found not target for teleport"};
+			if (target.Players == null || target.Players.Length != 1) return "Found not target for teleport";
 
 			Player targetPlayer = target.Players.First();
 
@@ -484,13 +496,13 @@ namespace MiNET.Plugins.Commands
 			}
 
 
-			return new SimpleResponse {Body = $"Teleported {body} to {targetPlayer.Username}."};
+			return $"Teleported {body} to {targetPlayer.Username}.";
 		}
 
 		[Command(Name = "tp", Aliases = new[] {"teleport"}, Description = "Teleports self to other player.")]
-		public SimpleResponse Teleport(Player commander, Target target)
+		public string Teleport(Player commander, Target target)
 		{
-			if (target.Players == null || target.Players.Length != 1) return new SimpleResponse {Body = "Found not target for teleport"};
+			if (target.Players == null || target.Players.Length != 1) return "Found not target for teleport";
 
 			Player targetPlayer = target.Players.First();
 
@@ -510,7 +522,7 @@ namespace MiNET.Plugins.Commands
 			}, null);
 
 
-			return new SimpleResponse {Body = $"Teleported to {targetPlayer.Username}."};
+			return $"Teleported to {targetPlayer.Username}.";
 		}
 
 		[Command]
@@ -531,7 +543,7 @@ namespace MiNET.Plugins.Commands
 		}
 
 		[Command]
-		public SimpleResponse GameMode(Player commander, GameMode gameMode, Target target = null)
+		public string GameMode(Player commander, GameMode gameMode, Target target = null)
 		{
 			Player targetPlayer = commander;
 			if (target != null) targetPlayer = target.Players.First();
@@ -548,7 +560,37 @@ namespace MiNET.Plugins.Commands
 
 			commander.Level.BroadcastMessage($"{targetPlayer.Username} changed to game mode {gameMode}.", type: MessageType.Raw);
 
-			return new SimpleResponse {Body = $"Set {targetPlayer.Username} game mode to {gameMode}."};
+			return $"Set {targetPlayer.Username} game mode to {gameMode}.";
+		}
+
+		[Command]
+		public string GameRule(Player player, GameRulesEnum rule)
+		{
+			return $"{rule.ToString().ToLower()}={player.Level.GetGameRule(rule).ToString().ToLower()}.";
+		}
+
+		[Command]
+		public string GameRule(Player player, GameRulesEnum rule, bool value)
+		{
+			player.Level.SetGameRule(rule, value);
+			player.Level.BroadcastGameRules();
+			return $"{player.Username} set {rule.ToString().ToLower()} to {value.ToString().ToLower()}.";
+		}
+
+		[Command]
+		public string Daylock(Player player, bool value)
+		{
+			Level level = player.Level;
+			level.SetGameRule(GameRulesEnum.DoDaylightcycle, !value);
+			level.BroadcastGameRules();
+
+			level.WorldTime = 5000;
+
+			McpeSetTime message = McpeSetTime.CreateObject();
+			message.time = (int) level.WorldTime;
+			level.RelayBroadcast(message);
+
+			return $"{player.Username} set day to 5000 and locked time.";
 		}
 
 		[Command]

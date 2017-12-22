@@ -13,7 +13,7 @@
 // WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
 // the specific language governing rights and limitations under the License.
 // 
-// The Original Code is Niclas Olofsson.
+// The Original Code is MiNET.
 // 
 // The Original Developer is the Initial Developer.  The Initial Developer of
 // the Original Code is Niclas Olofsson.
@@ -25,7 +25,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using log4net;
@@ -54,18 +53,11 @@ namespace MiNET
 				GameMode gameMode = Config.GetProperty("GameMode", GameMode.Survival);
 				Difficulty difficulty = Config.GetProperty("Difficulty", Difficulty.Normal);
 				int viewDistance = Config.GetProperty("ViewDistance", 11);
-				bool enableBlockTicking = Config.GetProperty("EnableBlockTicking", false);
-				bool enableChunkTicking = Config.GetProperty("EnableChunkTicking", false);
-				bool isWorldTimeStarted = Config.GetProperty("IsWorldTimeStarted", false);
 
 				IWorldProvider worldProvider = null;
 
 				switch (Config.GetProperty("WorldProvider", "flat").ToLower().Trim())
 				{
-					case "flat":
-					case "flatland":
-						worldProvider = new FlatlandWorldProvider();
-						break;
 					case "cool":
 						worldProvider = new CoolWorldProvider();
 						break;
@@ -73,72 +65,87 @@ namespace MiNET
 						worldProvider = new ExperimentalWorldProvider();
 						break;
 					case "anvil":
-						worldProvider = new AnvilWorldProvider()
+					case "flat":
+					case "flatland":
+					default:
+						worldProvider = new AnvilWorldProvider
 						{
-							MissingChunkProvider = new FlatlandWorldProvider(),
+							MissingChunkProvider = new SuperflatGenerator(Dimension.Overworld),
 							ReadSkyLight = !Config.GetProperty("CalculateLights", false),
 							ReadBlockLight = !Config.GetProperty("CalculateLights", false),
 						};
 						break;
-					default:
-						worldProvider = new FlatlandWorldProvider();
-						break;
 				}
 
-				level = new Level(name, worldProvider, EntityManager, gameMode, difficulty, viewDistance)
+				level = new Level(this, name, worldProvider, EntityManager, gameMode, difficulty, viewDistance)
 				{
-					EnableBlockTicking = enableBlockTicking,
-					EnableChunkTicking = enableChunkTicking,
-					IsWorldTimeStarted = isWorldTimeStarted
+					EnableBlockTicking = Config.GetProperty("EnableBlockTicking", false),
+					EnableChunkTicking = Config.GetProperty("EnableChunkTicking", false),
+					SaveInterval = Config.GetProperty("Save.Interval", 300),
+					UnloadInterval = Config.GetProperty("Unload.Interval", 30),
+
+					DrowningDamage = Config.GetProperty("GameRule.DrowningDamage", true),
+					CommandblockOutput = Config.GetProperty("GameRule.CommandblockOutput", true),
+					DoTiledrops = Config.GetProperty("GameRule.DoTiledrops", true),
+					DoMobloot = Config.GetProperty("GameRule.DoMobloot", true),
+					KeepInventory = Config.GetProperty("GameRule.KeepInventory", true),
+					DoDaylightcycle = Config.GetProperty("GameRule.DoDaylightcycle", true),
+					DoMobspawning = Config.GetProperty("GameRule.DoMobspawning", true),
+					DoEntitydrops = Config.GetProperty("GameRule.DoEntitydrops", true),
+					DoFiretick = Config.GetProperty("GameRule.DoFiretick", true),
+					DoWeathercycle = Config.GetProperty("GameRule.DoWeathercycle", true),
+					Pvp = Config.GetProperty("GameRule.Pvp", true),
+					Falldamage = Config.GetProperty("GameRule.Falldamage", true),
+					Firedamage = Config.GetProperty("GameRule.Firedamage", true),
+					Mobgriefing = Config.GetProperty("GameRule.Mobgriefing", true),
+					ShowCoordinates = Config.GetProperty("GameRule.ShowCoordinates", true),
+					NaturalRegeneration = Config.GetProperty("GameRule.NaturalRegeneration", true),
+					TntExplodes = Config.GetProperty("GameRule.TntExplodes", true),
+					SendCommandfeedback = Config.GetProperty("GameRule.SendCommandfeedback", true),
+					RandomTickSpeed = Config.GetProperty("GameRule.RandomTickSpeed", 3),
 				};
 				level.Initialize();
 
-				if (Config.GetProperty("CalculateLights", false))
-				{
-					{
-						AnvilWorldProvider wp = level._worldProvider as AnvilWorldProvider;
-						if (wp != null)
-						{
-							wp.PruneAir();
-							wp.MakeAirChunksAroundWorldToCompensateForBadRendering();
+				//if (Config.GetProperty("CalculateLights", false))
+				//{
+				//	{
+				//		AnvilWorldProvider wp = level.WorldProvider as AnvilWorldProvider;
+				//		if (wp != null)
+				//		{
+				//			wp.Locked = true;
+				//			Stopwatch sw = new Stopwatch();
 
-							SkyLightCalculations.Calculate(level);
+				//			var chunkCount = 0;
+				//			sw.Restart();
+				//			SkyLightCalculations.Calculate(level);
+				//			sw.Stop();
+				//			chunkCount = wp._chunkCache.Where(chunk => chunk.Value != null).ToArray().Length;
+				//			Log.Debug($"Recalculated sky light for {chunkCount} chunks, {chunkCount*16*16*256} blocks. Time {sw.ElapsedMilliseconds}ms");
 
-							Stopwatch sw = new Stopwatch();
+				//			int count = wp.LightSources.Count;
+				//			sw.Restart();
+				//			RecalculateBlockLight(level, wp);
 
-							int count = wp.LightSources.Count;
-							sw.Restart();
-							RecalculateBlockLight(level, wp);
+				//			chunkCount = wp._chunkCache.Where(chunk => chunk.Value != null).ToArray().Length;
+				//			Log.Debug($"Recalculated sky and block light for {chunkCount} chunks, {chunkCount*16*16*256} blocks and {count} light sources. Time {sw.ElapsedMilliseconds}ms. Touched {BlockLightCalculations.touches}");
 
-							var chunkCount = wp._chunkCache.Where(chunk => chunk.Value != null).ToArray().Length;
-							Log.Debug($"Recalc light for {chunkCount} chunks, {chunkCount*16*16*256} blocks and {count} light sources. Time {sw.ElapsedMilliseconds}ms");
-						}
-					}
+				//			wp.Locked = false;
+				//		}
+				//	}
+				//}
 
-					{
-						FlatlandWorldProvider wp = level._worldProvider as FlatlandWorldProvider;
-						if (wp != null)
-						{
-							SkyLightCalculations.Calculate(level);
-						}
-					}
-				}
 				Levels.Add(level);
 
-				OnLevelCreated(new LevelEventArgs(null, level));
+				OnLevelCreated(new LevelCancelEventArgs(null, level));
 			}
 
 			return level;
 		}
 
-		public void RecalculateBlockLight(Level level, AnvilWorldProvider wp)
+		public static void RecalculateBlockLight(Level level, AnvilWorldProvider wp)
 		{
-			while (wp.LightSources.Count > 0)
-			{
-				var block = wp.LightSources.Dequeue();
-				block = level.GetBlock(block.Coordinates);
-				BlockLightCalculations.Calculate(level, block);
-			}
+			var sources = wp.LightSources.ToArray();
+			Parallel.ForEach(sources, block => { BlockLightCalculations.Calculate(level, block.Coordinates); });
 		}
 
 		public void RemoveLevel(Level level)
@@ -156,6 +163,74 @@ namespace MiNET
 		protected virtual void OnLevelCreated(LevelEventArgs e)
 		{
 			LevelCreated?.Invoke(this, e);
+		}
+
+		public virtual Level GetDimension(Level level, Dimension dimension)
+		{
+			if (dimension == Dimension.Overworld) throw new Exception($"Can not get level for '{dimension}' from the LevelManager");
+			if (dimension == Dimension.Nether && !level.WorldProvider.HaveNether()) return null;
+			if (dimension == Dimension.TheEnd && !level.WorldProvider.HaveTheEnd()) return null;
+
+			AnvilWorldProvider overworld = level.WorldProvider as AnvilWorldProvider;
+			if (overworld == null) return null;
+
+			var worldProvider = new AnvilWorldProvider(overworld.BasePath)
+			{
+				ReadBlockLight = overworld.ReadBlockLight,
+				ReadSkyLight = overworld.ReadSkyLight,
+				Dimension = dimension,
+				MissingChunkProvider = new SuperflatGenerator(dimension),
+			};
+
+			Level newLevel = new Level(level.LevelManager, level.LevelId + "_" + dimension, worldProvider, EntityManager, level.GameMode, level.Difficulty, level.ViewDistance)
+			{
+				OverworldLevel = level,
+				Dimension = dimension,
+				EnableBlockTicking = level.EnableBlockTicking,
+				EnableChunkTicking = level.EnableChunkTicking,
+				SaveInterval = level.SaveInterval,
+				UnloadInterval = level.UnloadInterval,
+
+				DrowningDamage = level.DrowningDamage,
+				CommandblockOutput = level.CommandblockOutput,
+				DoTiledrops = level.DoTiledrops,
+				DoMobloot = level.DoMobloot,
+				KeepInventory = level.KeepInventory,
+				DoDaylightcycle = level.DoDaylightcycle,
+				DoMobspawning = level.DoMobspawning,
+				DoEntitydrops = level.DoEntitydrops,
+				DoFiretick = level.DoFiretick,
+				DoWeathercycle = level.DoWeathercycle,
+				Pvp = level.Pvp,
+				Falldamage = level.Falldamage,
+				Firedamage = level.Firedamage,
+				Mobgriefing = level.Mobgriefing,
+				ShowCoordinates = level.ShowCoordinates,
+				NaturalRegeneration = level.NaturalRegeneration,
+				TntExplodes = level.TntExplodes,
+				SendCommandfeedback = level.SendCommandfeedback,
+				RandomTickSpeed = level.RandomTickSpeed,
+			};
+
+			newLevel.Initialize();
+
+			//if (Config.GetProperty("CalculateLights", false))
+			//{
+			//	worldProvider.Locked = true;
+			//	SkyLightCalculations.Calculate(newLevel);
+
+			//	int count = worldProvider.LightSources.Count;
+			//	Log.Debug($"Recalculating block light for {count} light sources.");
+			//	Stopwatch sw = new Stopwatch();
+			//	sw.Start();
+			//	RecalculateBlockLight(newLevel, worldProvider);
+
+			//	var chunkCount = worldProvider._chunkCache.Where(chunk => chunk.Value != null).ToArray().Length;
+			//	Log.Debug($"Recalc sky and block light for {chunkCount} chunks, {chunkCount*16*16*256} blocks and {count} light sources. Time {sw.ElapsedMilliseconds}ms");
+			//	worldProvider.Locked = false;
+			//}
+
+			return newLevel;
 		}
 	}
 
@@ -198,19 +273,19 @@ namespace MiNET
 			int viewDistance = Config.GetProperty("ViewDistance", 11);
 
 			IWorldProvider worldProvider = null;
-			worldProvider = provider ?? new FlatlandWorldProvider();
+			worldProvider = provider ?? new AnvilWorldProvider {MissingChunkProvider = new SuperflatGenerator(Dimension.Overworld)};
 
-			var level = new Level(name, worldProvider, EntityManager, gameMode, difficulty, viewDistance);
+			var level = new Level(this, name, worldProvider, EntityManager, gameMode, difficulty, viewDistance);
 			level.Initialize();
 
-			OnLevelCreated(new LevelEventArgs(null, level));
+			OnLevelCreated(new LevelCancelEventArgs(null, level));
 
 			return level;
 		}
 
-		public event EventHandler<LevelEventArgs> LevelCreated;
+		public event EventHandler<LevelCancelEventArgs> LevelCreated;
 
-		protected virtual void OnLevelCreated(LevelEventArgs e)
+		protected virtual void OnLevelCreated(LevelCancelEventArgs e)
 		{
 			LevelCreated?.Invoke(this, e);
 		}

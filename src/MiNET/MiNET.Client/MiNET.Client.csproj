@@ -34,11 +34,20 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Linux|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Linux\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="fNbt, Version=0.6.9.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\MiNET.fnbt.0.6.9\lib\net35-client\fNbt.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="fNbt, Version=1.0.13.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MiNET.fnbt.1.0.13\lib\net461\fNbt.dll</HintPath>
     </Reference>
     <Reference Include="jose-jwt, Version=2.3.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\jose-jwt.2.3.0\lib\net461\jose-jwt.dll</HintPath>

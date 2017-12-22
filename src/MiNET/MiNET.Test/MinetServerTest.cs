@@ -13,7 +13,7 @@
 // WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
 // the specific language governing rights and limitations under the License.
 // 
-// The Original Code is Niclas Olofsson.
+// The Original Code is MiNET.
 // 
 // The Original Developer is the Initial Developer.  The Initial Developer of
 // the Original Code is Niclas Olofsson.
@@ -25,12 +25,16 @@
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Numerics;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 using AStarNavigator;
 using AStarNavigator.Algorithms;
 using AStarNavigator.Providers;
@@ -45,7 +49,133 @@ namespace MiNET
 	[TestFixture]
 	public class MinetServerTest
 	{
-		[Test]
+		[Test , Ignore("")]
+		public void IntVsInt24PerformanceTest()
+		{
+			ConcurrentDictionary<int, Datagram> waitingForAcksQueue = new ConcurrentDictionary<int, Datagram>();
+			//ConcurrentDictionary<Int24, Datagram> waitingForAcksQueue = new ConcurrentDictionary<Int24, Datagram>();
+
+			for (int i = 0; i < 1000000; i++)
+			{
+				Datagram dgram = new Datagram();
+				waitingForAcksQueue.TryAdd(i, dgram);
+			}
+		}
+
+
+		[Test, Ignore("")]
+		public void HighPrecTimerLoadTest()
+		{
+			Stopwatch sw = new Stopwatch();
+			List<HighPrecisionTimer> timers = new List<HighPrecisionTimer>();
+			for (int i = 0; i < 100; i++)
+			{
+				timers.Add(new HighPrecisionTimer(10, SendTick, false));
+			}
+
+			Console.WriteLine($"Created {timers.Count} timers, sleeping");
+
+			Thread.Sleep(10000);
+
+			Console.WriteLine($"Done with {timers.Count} timers. Disposing");
+
+			long spins = 0;
+			long sleeps = 0;
+			long misses = 0;
+			long yields = 0;
+			foreach (var timer in timers)
+			{
+				spins += timer.Spins;
+				sleeps += timer.Sleeps;
+				misses += timer.Misses;
+				yields += timer.Yields;
+				timer.Dispose();
+			}
+
+			Console.WriteLine($"End {timers.Count} timers. " +
+			                  $"\nSpins/timer={spins/timers.Count}, " +
+			                  $"\nSleeps/timer={sleeps/timers.Count}, " +
+			                  $"\nMisses/timer={misses/timers.Count}, " +
+			                  $"\nYields/timer={yields/timers.Count} ");
+		}
+
+		[Test, Ignore("")]
+		public void HighPrecTimerSignalingLoadTest()
+		{
+			List<Thread> threads = new List<Thread>();
+			for (int i = 0; i < 1000; i++)
+			{
+				threads.Add(new Thread(Runner));
+			}
+
+			threads.ForEach(t => t.Start());
+
+			var timer = new HighPrecisionTimer(TIME/2, Interrupt, false);
+		}
+
+		private const int TIME = 200;
+
+		ManualResetEvent signal = new ManualResetEvent(false);
+		public CancellationTokenSource cancel = new CancellationTokenSource();
+
+
+		int _count = 0;
+		int _interrupts = 0;
+		long _timeWaiting = 0;
+		long _errors = 0;
+
+		public void PrintResults()
+		{
+			signal.Set();
+			Thread.Sleep(4000);
+			Console.WriteLine($"Interrupted {_interrupts} times. ");
+			Console.WriteLine($"Ticked {_count} times. ");
+			Console.WriteLine($"Errors {_errors}. ");
+			Console.WriteLine($"Avg {_timeWaiting/_count} wait. ");
+		}
+
+		private void Runner()
+		{
+			Stopwatch sw = new Stopwatch();
+			int count = 0;
+			int errors = 0;
+			long timeWaiting = 0;
+			while (!cancel.IsCancellationRequested)
+			{
+				sw.Restart();
+				signal.WaitOne();
+				var elapsedMilliseconds = sw.ElapsedMilliseconds;
+				if (elapsedMilliseconds < TIME - 5) errors++;
+				if (elapsedMilliseconds > TIME + 5) errors++;
+				timeWaiting += elapsedMilliseconds;
+				count++;
+				//Console.WriteLine($"Tick. ");
+			}
+
+			Interlocked.Add(ref _count, count);
+			Interlocked.Add(ref _timeWaiting, timeWaiting);
+			Interlocked.Add(ref _errors, errors);
+		}
+
+		private void Interrupt(object obj)
+		{
+			if (signal.WaitOne(0))
+			{
+				signal.Reset();
+			}
+			else
+			{
+				_interrupts++;
+				signal.Set();
+			}
+		}
+
+
+		private void SendTick(object obj)
+		{
+		}
+
+		[Test, Ignore("")]
 		public void TestPathFinder()
 		{
 			var navigator = new TileNavigator(
@@ -55,8 +185,8 @@ namespace MiNET
 				new ManhattanHeuristicAlgorithm() // Instance of: IDistanceAlgorithm
 			);
 
-			var from = new Tile(-100.5, -102.5);
-			var to = new Tile(120.5, 122.5);
+			var from = new Tile(-100, -102);
+			var to = new Tile(120, 122);
 
 			navigator.Navigate(from, to);
 		}
@@ -73,7 +203,7 @@ namespace MiNET
 		//	Assert.AreEqual(uuidString, newUuid.ToString());
 		//}
 
-		[Test]
+		[Test, Ignore("")]
 		public void TestUuid()
 		{
 			string uuidString = "a821263b-0df8-44ed-87b7-d57a23fdccfc";
@@ -87,7 +217,7 @@ namespace MiNET
 			Assert.AreEqual(inputBytes, uuid.GetBytes());
 		}
 
-		[Test]
+		[Test, Ignore("")]
 		public void TestBitArray()
 		{
 			BitArray bits = new BitArray(64);
@@ -120,7 +250,7 @@ namespace MiNET
 			//81808080808080808001                    .
 		}
 
-		[Test]
+		[Test, Ignore("")]
 		public void TestCustomVarInt()
 		{
 			{
@@ -165,7 +295,7 @@ namespace MiNET
 			return bytes;
 		}
 
-		[Test]
+		[Test, Ignore("")]
 		public void TestForce()
 		{
 			int j = 20;
@@ -249,7 +379,7 @@ namespace MiNET
 			}
 		}
 
-		[Test]
+		[Test, Ignore("")]
 		public void AckSeriesTest()
 		{
 			{
@@ -332,7 +462,7 @@ namespace MiNET
 		}
 
 
-		[Test]
+		[Test, Ignore("")]
 		public void BlockEntityTest()
 		{
 			NbtFile file = new NbtFile();
@@ -373,7 +503,7 @@ namespace MiNET
 		}
 
 
-		[Test]
+		[Test, Ignore("")]
 		public void NetworkToAsciiTest()
 		{
 			IPAddress ip;
@@ -401,7 +531,7 @@ namespace MiNET
 			Console.WriteLine("ip is " + ip.ToString());
 		}
 
-		[Test]
+		[Test, Ignore("")]
 		public void EncapsulatedHeaderTest()
 		{
 			DatagramHeader header = new DatagramHeader(0x8c);
@@ -524,5 +654,15 @@ namespace MiNET
 			sb.Append(string.Join(", ", flags));
 			Assert.AreEqual("", sb.ToString());
 		}
+
+		[Test]
+		public void EntityNameTranslationTest()
+		{
+			string entityName = EntityType.ElderGuardian.ToString();
+			entityName = Regex.Replace(entityName, "([A-Z])", "_$1").TrimStart('_').ToLower();
+
+			Assert.AreEqual("elder_guardian", entityName);
+		}
+
 	}
 }

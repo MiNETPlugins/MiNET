@@ -1,4 +1,29 @@
-﻿using System;
+﻿#region LICENSE
+
+// The contents of this file are subject to the Common Public Attribution
+// License Version 1.0. (the "License"); you may not use this file except in
+// compliance with the License. You may obtain a copy of the License at
+// https://github.com/NiclasOlofsson/MiNET/blob/master/LICENSE. 
+// The License is based on the Mozilla Public License Version 1.1, but Sections 14 
+// and 15 have been added to cover use of software over a computer network and 
+// provide for limited attribution for the Original Developer. In addition, Exhibit A has 
+// been modified to be consistent with Exhibit B.
+// 
+// Software distributed under the License is distributed on an "AS IS" basis,
+// WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+// the specific language governing rights and limitations under the License.
+// 
+// The Original Code is MiNET.
+// 
+// The Original Developer is the Initial Developer.  The Initial Developer of
+// the Original Code is Niclas Olofsson.
+// 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2017 Niclas Olofsson. 
+// All Rights Reserved.
+
+#endregion
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -17,14 +42,16 @@ namespace MiNET.Entities
 		public bool DespawnIfNotSeenPlayer { get; set; }
 		public DateTime LastSeenPlayerTimer { get; set; }
 
+		public List<ITargetingBehavior> TargetBehaviors { get; } = new List<ITargetingBehavior>();
+		private ITargetingBehavior _currentTargetBehavior = null;
 		public List<IBehavior> Behaviors { get; } = new List<IBehavior>();
 		private IBehavior _currentBehavior = null;
 		public MobController Controller { get; private set; }
 
 		public double Direction { get; set; }
-		public double Speed { get; set; } = 0.25f;
+		public virtual double Speed { get; set; } = 0.25f;
 
-		public bool IsOnGround { get; set; }
+		public bool IsRidden { get; set; }
 
 		public Entity Target { get; private set; }
 
@@ -53,8 +80,14 @@ namespace MiNET.Entities
 			BroadcastSetEntityData();
 		}
 
+		public static double ClampDegrees(double degrees)
+		{
+			return Math.Floor((degrees%360 + 360)%360);
+		}
+
 		public Vector3 GetHorizDir()
 		{
+			Direction = ClampDegrees(Direction);
 			Vector3 vector = new Vector3();
 
 			double pitch = 0;
@@ -72,36 +105,65 @@ namespace MiNET.Entities
 			base.SpawnEntity();
 		}
 
+		public override EntityAttributes GetEntityAttributes()
+		{
+			var attributes = base.GetEntityAttributes();
+			attributes["minecraft:movement"] = new EntityAttribute
+			{
+				Name = "minecraft:movement",
+				MinValue = 0,
+				MaxValue = float.MaxValue,
+				Value = (float)Speed
+			};
+
+			return attributes;
+		}
+
 
 		public Vector3 _lastSentRotation = Vector3.Zero;
 		public Vector3 _lastSentPos = new Vector3();
 
-		public override void OnTick()
+		public override void OnTick(Entity[] entities)
 		{
-			base.OnTick();
+			base.OnTick(entities);
 
 			if (HealthManager.IsDead) return;
 
-			if (Level.EnableChunkTicking && DespawnIfNotSeenPlayer && DateTime.UtcNow - LastSeenPlayerTimer > TimeSpan.FromSeconds(30))
+			bool noPlayersWithin32 = false;
+			if (Level.EnableChunkTicking && DespawnIfNotSeenPlayer)
 			{
-				if (Level.Players.Count(player => player.Value.IsSpawned && Vector3.Distance(KnownPosition, player.Value.KnownPosition) < 32) == 0)
+				if (Level.Players.Count(player => player.Value.IsSpawned && Vector3.Distance(KnownPosition, player.Value.KnownPosition) < 128) == 0)
 				{
-					if (Level.Random.Next(800) == 0)
-					{
-						if (Log.IsDebugEnabled)
-							Log.Debug($"Despawn because didn't see any players within 32 blocks for 30s or longer. Last seen {LastSeenPlayerTimer}");
+					if (Log.IsDebugEnabled)
+						Log.Debug($"Despawn because didn't see any players within 128 blocks.");
 
-						DespawnEntity();
-						return;
+					DespawnEntity();
+					return;
+				}
+				if (DateTime.UtcNow - LastSeenPlayerTimer > TimeSpan.FromSeconds(30))
+				{
+					if (Level.Players.Count(player => player.Value.IsSpawned && Vector3.Distance(KnownPosition, player.Value.KnownPosition) < 32) == 0)
+					{
+						if (Level.Random.Next(800) == 0)
+						{
+							if (Log.IsDebugEnabled)
+								Log.Debug($"Despawn because didn't see any players within 32 blocks for 30s or longer. Last seen {LastSeenPlayerTimer}");
+
+							DespawnEntity();
+							return;
+						}
+
+						noPlayersWithin32 = true;
+					}
+					else
+					{
+						LastSeenPlayerTimer = DateTime.UtcNow;
 					}
 				}
 				else
 				{
-					LastSeenPlayerTimer = DateTime.UtcNow;
 				}
 			}
-
-			_currentBehavior = GetBehavior();
 
 			// Execute move
 			bool onGroundBefore = IsMobOnGround(KnownPosition);
@@ -111,7 +173,8 @@ namespace MiNET.Entities
 			KnownPosition.Z += (float) Velocity.Z;
 
 			// Fix potential fall through ground because of speed
-			IsOnGround = IsMobOnGround(KnownPosition);
+			bool inWater = IsMobInFluid(KnownPosition);
+			IsOnGround = !inWater && IsMobOnGround(KnownPosition);
 			if (!onGroundBefore && IsOnGround)
 			{
 				while (Level.GetBlock(KnownPosition).IsSolid)
@@ -131,18 +194,34 @@ namespace MiNET.Entities
 				_lastSentPos = KnownPosition;
 				_lastSentRotation = KnownPosition.GetDirection();
 
-				BroadcastMove();
-				BroadcastMotion();
+				if (!IsRidden)
+				{
+					BroadcastMove();
+					BroadcastMotion();
+				}
 			}
 
-			// Calculate velocity for next move
-			_currentBehavior?.OnTick();
+			var oldVelocity = Velocity;
 
-			bool inWater = IsMobInFluid(KnownPosition);
+			// Below: Calculate velocity for next move
+
+			_currentTargetBehavior = GetBehavior(TargetBehaviors, _currentTargetBehavior);
+			_currentBehavior = GetBehavior(Behaviors, _currentBehavior);
+
+			_currentTargetBehavior?.OnTick(entities);
+			_currentBehavior?.OnTick(entities);
+
+			if (IsRidden) return;
+
+			if (noPlayersWithin32)
+			{
+				Velocity = oldVelocity;
+			}
 
 			if (inWater && Level.Random.NextDouble() < 0.8)
 			{
 				Velocity += new Vector3(0, 0.039f, 0);
+				Velocity *= new Vector3(0.2f, 1.0f, 0.2f);
 			}
 			else if (IsOnGround)
 			{
@@ -162,11 +241,11 @@ namespace MiNET.Entities
 			Velocity *= drag;
 		}
 
-		private IBehavior GetBehavior()
+		private static T GetBehavior<T>(List<T> behaviors, T currentBehavior) where T: class, IBehavior
 		{
-			foreach (var behavior in Behaviors)
+			foreach (var behavior in behaviors)
 			{
-				if (behavior == _currentBehavior)
+				if (behavior == currentBehavior)
 				{
 					if (behavior.CanContinue())
 					{
@@ -174,14 +253,15 @@ namespace MiNET.Entities
 					}
 
 					behavior.OnEnd();
-					_currentBehavior = null;
+					currentBehavior = null;
 				}
 
 				if (behavior.ShouldStart())
 				{
-					if (_currentBehavior == null || Behaviors.IndexOf(_currentBehavior) > Behaviors.IndexOf(behavior))
+					if (currentBehavior == null || behaviors.IndexOf(currentBehavior) > behaviors.IndexOf(behavior))
 					{
-						_currentBehavior?.OnEnd();
+						currentBehavior?.OnEnd();
+						behavior.OnStart();
 						return behavior;
 					}
 				}
@@ -333,7 +413,7 @@ namespace MiNET.Entities
 		{
 			Block block = Level.GetBlock(position);
 
-			return block is FlowingWater || block is StationaryWater || block is FlowingLava || block is StationaryLava;
+			return block is FlowingWater || block is Water || block is FlowingLava || block is Lava;
 		}
 
 		protected bool IsMobOnGround(Vector3 pos)

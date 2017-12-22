@@ -201,8 +201,11 @@ namespace MiNET
 			ticks = Math.Max(0, ticks);
 
 			FireTick = ticks;
-			IsOnFire = true;
-			Entity.BroadcastSetEntityData();
+			if (!IsOnFire)
+			{
+				IsOnFire = true;
+				Entity.BroadcastSetEntityData();
+			}
 		}
 
 		private object _killSync = new object();
@@ -234,7 +237,7 @@ namespace MiNET
 				Entity.BroadcastSetEntityData();
 				Entity.DespawnEntity();
 
-				if (!Config.GetProperty("KeepInventory", false))
+				if (!Entity.Level.KeepInventory)
 				{
 					player.DropInventory();
 				}
@@ -247,21 +250,21 @@ namespace MiNET
 			}
 			else
 			{
+				if (LastDamageSource is Player && Entity.Level.DoMobloot)
+				{
+					var drops = Entity.GetDrops();
+					foreach (var drop in drops)
+					{
+						Entity.Level.DropItem(Entity.KnownPosition.ToVector3(), drop);
+					}
+				}
+
 				// This is semi-good, but we need to give the death-animation time to play.
 
 				SendWithDelay(2000, () =>
 				{
 					Entity.BroadcastSetEntityData();
 					Entity.DespawnEntity();
-
-					if (LastDamageSource is Player)
-					{
-						var drops = Entity.GetDrops();
-						foreach (var drop in drops)
-						{
-							Entity.Level.DropItem(Entity.KnownPosition.ToVector3(), drop);
-						}
-					}
 				});
 			}
 		}
@@ -399,14 +402,12 @@ namespace MiNET
 
 			if (!IsInLava(Entity.KnownPosition) && IsOnFire)
 			{
-				FireTick--;
 				if (FireTick <= 0)
 				{
 					IsOnFire = false;
 					Entity.BroadcastSetEntityData();
 				}
-
-				if (FireTick%20 == 0)
+				else if (FireTick%20 == 0)
 				{
 					var player = Entity as Player;
 					if (player != null)
@@ -418,8 +419,10 @@ namespace MiNET
 					{
 						TakeHit(null, 1, DamageCause.FireTick);
 					}
-					Entity.BroadcastSetEntityData();
+					//Entity.BroadcastSetEntityData();
 				}
+
+				FireTick--;
 			}
 		}
 
